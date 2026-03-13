@@ -12,7 +12,7 @@ import {
     FileCode,
     FileQuestion
 } from 'lucide-react-native';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -22,7 +22,8 @@ import {
     Alert,
     FlatList,
     ListRenderItem,
-    Dimensions
+    Dimensions,
+    Platform
 } from 'react-native';
 import { ActivityIndicator, Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -32,7 +33,8 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { LucideIcon } from '../components/LucideIcon';
 import { Screen } from '../components/Screen';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { ImageViewerModal } from '../components/ImageViewerModal';
+import { MediaViewerModal } from '../components/MediaViewerModal';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useListDirectoryQuery } from '../store/authApi';
 import { API_BASE_URL } from '../config/api';
 import { RootDrawerParamList, FoldersStackParamList } from '../navigation/DrawerNavigator';
@@ -42,13 +44,25 @@ const FolderItem = React.memo(({ folder, onPress }: { folder: DirectoryFolder; o
     const theme = useTheme();
 
     return (
-        <Card mode="contained" style={[styles.card, { backgroundColor: theme.colors.surfaceVariant, opacity: 0.8 }]} onPress={onPress}>
+        <Card
+            mode="contained"
+            style={[
+                styles.card,
+                { backgroundColor: theme.colors.surfaceVariant, opacity: 0.8 },
+                {
+                    backgroundColor: theme.dark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)',
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#3b82f6'
+                }
+            ]}
+            onPress={onPress}
+        >
             <Card.Content style={styles.cardContent}>
                 <View style={styles.itemInfoContainer}>
-                    <LucideIcon icon={FolderIcon} color={theme.colors.primary} size={20} />
-                    <Text variant="bodyLarge" style={styles.itemName} numberOfLines={1}>{folder.name}</Text>
+                    <LucideIcon icon={FolderIcon} color={theme.colors.primary} size={28} />
+                    <Text variant="bodyLarge" style={[styles.itemName, { color: theme.dark ? '#93c5fd' : '#1e40af' }]} numberOfLines={1}>{folder.name}</Text>
                 </View>
-                <ChevronRight size={16} color={theme.colors.onSurfaceVariant} />
+                <ChevronRight size={28} color={theme.colors.onSurfaceVariant} />
             </Card.Content>
         </Card>
     );
@@ -104,16 +118,47 @@ const FileItem = React.memo(({ file, onPress }: { file: DirectoryFile; onPress: 
     };
 
     const fileInfo = getFileIcon(file.extension);
+    const ext = file.extension?.toLowerCase() || '';
+    const isVideo = ['.mp4', '.mkv', '.mov', '.avi', '.wmv', '.webm', '.m4v'].includes(ext);
+    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(ext);
 
     return (
-        <Card mode="contained" style={[styles.card, { backgroundColor: theme.colors.surfaceVariant, opacity: 0.8 }]} onPress={onPress}>
+        <Card
+            mode="contained"
+            style={[
+                styles.card,
+                { backgroundColor: theme.colors.surfaceVariant, opacity: 0.8 },
+                isVideo && {
+                    backgroundColor: theme.dark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#ef4444'
+                },
+                isImage && {
+                    backgroundColor: theme.dark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.08)',
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#f59e0b'
+                }
+            ]}
+            onPress={onPress}
+        >
             <Card.Content style={styles.cardContent}>
                 <View style={styles.itemInfoContainer}>
-                    <LucideIcon icon={fileInfo.icon} color={fileInfo.color} size={20} />
+                    <LucideIcon icon={fileInfo.icon} color={fileInfo.color} size={28} />
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text variant="bodyLarge" style={styles.itemName} numberOfLines={1}>{file.name}</Text>
-                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                            {formatSize(file.size)} {file.extension ? `• ${file.extension}` : ''}
+                        <Text
+                            variant="bodyLarge"
+                            style={[
+                                styles.itemName,
+                                { marginLeft: 0 },
+                                isVideo && { color: theme.dark ? '#fca5a5' : '#b91c1c' },
+                                isImage && { color: theme.dark ? '#fcd34d' : '#92400e' }
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {file.name}
+                        </Text>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, textTransform: 'uppercase' }}>
+                            {formatSize(file.size)} {file.extension ? `  ${file.extension.replace('.', '')}` : ''}
                         </Text>
                     </View>
                 </View>
@@ -124,12 +169,14 @@ const FileItem = React.memo(({ file, onPress }: { file: DirectoryFile; onPress: 
 
 export function FoldersScreen() {
     const theme = useTheme();
+    const breadcrumbScrollViewRef = useRef<ScrollView>(null);
     const route = useRoute<RouteProp<FoldersStackParamList, 'Folders'>>();
     const navigation = useNavigation<NativeStackNavigationProp<FoldersStackParamList>>();
 
     const [viewerVisible, setViewerVisible] = React.useState(false);
-    const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
-    const [imageList, setImageList] = React.useState<{ path: string; name: string }[]>([]);
+    const [mediaList, setMediaList] = React.useState<{ path: string; name: string }[]>([]);
+    const [selectedMediaIndex, setSelectedMediaIndex] = React.useState(0);
+    const [preparingFile, setPreparingFile] = React.useState(false);
 
     const path = route.params?.path || '';
     const folderName = route.params?.name || 'Root';
@@ -155,44 +202,80 @@ export function FoldersScreen() {
         });
     }, [path]);
 
+    useEffect(() => {
+        breadcrumbScrollViewRef.current?.scrollToEnd({ animated: true });
+    }, [breadcrumbs]);
+
     const handleFolderPress = (folder: DirectoryFolder) => {
         navigation.push('Folders', { path: folder.path, name: folder.name });
     };
 
     const handleFilePress = async (file: DirectoryFile) => {
-        const ext = file.extension?.toLowerCase();
-        const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(ext || '');
+        const ext = file.extension?.toLowerCase() || '';
+        const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(ext);
+        const isVideo = ['.mp4', '.m4v', '.mov', '.mkv', '.webm'].includes(ext);
 
-        if (isImage) {
-            const images = (data?.files || [])
+        if (isImage || isVideo) {
+            const media = (data?.files || [])
                 .filter(f => {
                     const fExt = f.extension?.toLowerCase() || '';
-                    return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(fExt);
+                    return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.mp4', '.m4v', '.mov', '.mkv', '.webm'].includes(fExt);
                 })
                 .map(f => ({ path: f.url, name: f.name }));
 
-            const index = images.findIndex(img => img.path === file.url);
+            const index = media.findIndex(m => m.path === file.url);
 
-            setImageList(images);
-            setSelectedImageIndex(index >= 0 ? index : 0);
+            setMediaList(media);
+            setSelectedMediaIndex(index >= 0 ? index : 0);
             setViewerVisible(true);
             return;
         }
 
-        // Construct the full URL for the file for non-images
-        const fileUrl = `${API_BASE_URL}/api/drives/file?path=${file.path}`;
+        // For non-media files, download to cache and open with system app
+        setPreparingFile(true);
+        const fileName = file.name;
+        const tempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/${fileName}`;
 
         try {
-            const supported = await Linking.canOpenURL(fileUrl);
-            if (supported) {
-                await Linking.openURL(fileUrl);
+            const res = await ReactNativeBlobUtil
+                .config({
+                    path: tempPath,
+                    fileCache: true,
+                })
+                .fetch('GET', file.url);
+
+            const localPath = res.path();
+
+            if (Platform.OS === 'android') {
+                // Get MIME type based on extension
+                const mimeType = getMimeType(ext);
+                await ReactNativeBlobUtil.android.actionViewIntent(localPath, mimeType);
             } else {
-                Alert.alert('Error', `Don't know how to open this URL: ${fileUrl}`);
+                await ReactNativeBlobUtil.ios.openDocument(localPath);
             }
         } catch (error) {
-            Alert.alert('Error', 'An error occurred while trying to open the file.');
-            console.error(error);
+            console.error('Error opening file:', error);
+            Alert.alert('Error', 'Could not open this file with any supported application.');
+        } finally {
+            setPreparingFile(false);
         }
+    };
+
+    const getMimeType = (ext: string) => {
+        const mimeTypes: { [key: string]: string } = {
+            '.pdf': 'application/pdf',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xls': 'application/vnd.ms-excel',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.ppt': 'application/vnd.ms-powerpoint',
+            '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            '.txt': 'text/plain',
+            '.zip': 'application/zip',
+            '.rar': 'application/x-rar-compressed',
+            '.apk': 'application/vnd.android.package-archive',
+        };
+        return mimeTypes[ext] || '*/*';
     };
 
     const combinedData = useMemo(() => {
@@ -221,9 +304,11 @@ export function FoldersScreen() {
         <Screen style={{ backgroundColor: theme.colors.background }} scrollable={false} noPadding>
             <View style={styles.header}>
                 <ScrollView
+                    ref={breadcrumbScrollViewRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.breadcrumbContainer}
+
                 >
                     <Pressable onPress={() => navigation.getParent()?.navigate('Home')}>
                         <Text variant="labelLarge" style={{ color: theme.colors.primary }}>Drives</Text>
@@ -236,7 +321,9 @@ export function FoldersScreen() {
                                     variant="labelLarge"
                                     style={{
                                         color: index === breadcrumbs.length - 1 ? theme.colors.onSurface : theme.colors.primary,
-                                        fontWeight: index === breadcrumbs.length - 1 ? '700' : '400'
+                                        fontWeight: index === breadcrumbs.length - 1 ? '700' : '400',
+                                        textTransform: 'capitalize',
+                                        fontSize: 16,
                                     }}
                                 >
                                     {crumb.name}
@@ -253,6 +340,7 @@ export function FoldersScreen() {
             </View>
 
             <LoadingOverlay visible={isLoading || isFetching} message="Browsing..." />
+            <LoadingOverlay visible={preparingFile} message="Preparing file..." />
 
             {!path ? (
                 <View style={styles.centerContent}>
@@ -278,11 +366,11 @@ export function FoldersScreen() {
                 />
             )}
 
-            <ImageViewerModal
+            <MediaViewerModal
                 visible={viewerVisible}
-                images={imageList}
-                initialIndex={selectedImageIndex}
                 onClose={() => setViewerVisible(false)}
+                media={mediaList}
+                initialIndex={selectedMediaIndex}
             />
         </Screen>
     );
@@ -321,7 +409,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 24,
         paddingHorizontal: 16,
     },
     itemInfoContainer: {
@@ -332,6 +420,7 @@ const styles = StyleSheet.create({
     itemName: {
         marginLeft: 12,
         fontWeight: '500',
+        fontSize: 18,
     },
     centerContent: {
         flex: 1,

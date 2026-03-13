@@ -12,6 +12,7 @@ import { Drive } from '../types/drives';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { RootDrawerParamList } from '../navigation/DrawerNavigator';
+import convertSize from "convert-size";
 
 const DriveCard = React.memo(({ drive, onPress }: { drive: Drive; onPress: () => void }) => {
   const theme = useTheme();
@@ -22,7 +23,7 @@ const DriveCard = React.memo(({ drive, onPress }: { drive: Drive; onPress: () =>
         <View style={styles.driveTextContainer}>
           <Text variant="titleMedium" style={{ fontWeight: '700' }}>{drive.name}</Text>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={1}>
-            {drive.path}
+            Size: {convertSize(Number(drive.size) ?? 0, { accuracy: -1 })}
           </Text>
         </View>
         <View
