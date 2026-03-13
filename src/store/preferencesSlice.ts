@@ -1,11 +1,18 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+export type PinnedFolder = {
+  path: string;
+  name: string;
+};
+
 type PreferencesState = {
   isDarkMode: boolean;
+  pinnedFolders: PinnedFolder[];
 };
 
 const initialState: PreferencesState = {
   isDarkMode: false,
+  pinnedFolders: [],
 };
 
 const preferencesSlice = createSlice({
@@ -15,8 +22,20 @@ const preferencesSlice = createSlice({
     toggleDarkMode(state) {
       state.isDarkMode = !state.isDarkMode;
     },
+    togglePinFolder(state, action: { payload: PinnedFolder }) {
+      if (!state.pinnedFolders) {
+        state.pinnedFolders = [];
+      }
+      const folder = action.payload;
+      const index = state.pinnedFolders.findIndex(f => f.path === folder.path);
+      if (index >= 0) {
+        state.pinnedFolders.splice(index, 1);
+      } else {
+        state.pinnedFolders.push(folder);
+      }
+    },
   },
 });
 
-export const { toggleDarkMode } = preferencesSlice.actions;
+export const { toggleDarkMode, togglePinFolder } = preferencesSlice.actions;
 export default preferencesSlice.reducer;

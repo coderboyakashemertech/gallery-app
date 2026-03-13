@@ -3,10 +3,11 @@ import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
   DrawerItemList,
+  DrawerItem,
   createDrawerNavigator,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { CircleUserRound, FolderOpen, House, LogOut, Menu, MoonStar, Settings } from 'lucide-react-native';
+import { CircleUserRound, FolderOpen, House, LogOut, Menu, MoonStar, Settings, Pin } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Divider, Switch, Text, useTheme } from 'react-native-paper';
@@ -108,6 +109,7 @@ function HeaderRight() {
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const user = useAppSelector(state => state.auth.user);
+  const pinnedFolders = useAppSelector(state => state.preferences.pinnedFolders || []);
   const theme = useTheme();
 
   return (
@@ -130,6 +132,35 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
       <View style={{ marginTop: 16 }}>
         <DrawerItemList {...props} />
       </View>
+
+      {pinnedFolders.length > 0 && (
+        <>
+          <Divider style={[styles.drawerDivider, { marginTop: 16 }]} />
+          <View style={styles.pinnedSection}>
+            <View style={styles.pinnedHeader}>
+              <LucideIcon icon={Pin} color={theme.colors.onSurfaceVariant} size={16} />
+              <Text variant="labelMedium" style={styles.pinnedTitle}>PINNED FOLDERS</Text>
+            </View>
+            {pinnedFolders.map((folder) => (
+              <DrawerItem
+                key={folder.path}
+                label={folder.name}
+                icon={({ color, size }) => <LucideIcon icon={FolderOpen} color={color} size={size} />}
+                onPress={() => {
+                  props.navigation.navigate('FoldersStack', {
+                    screen: 'Folders',
+                    params: { path: folder.path, name: folder.name }
+                  });
+                }}
+                activeTintColor={theme.colors.primary}
+                inactiveTintColor={theme.colors.onSurfaceVariant}
+                labelStyle={{ fontWeight: '500' }}
+                style={styles.pinnedItem}
+              />
+            ))}
+          </View>
+        </>
+      )}
     </DrawerContentScrollView>
   );
 }
@@ -240,5 +271,26 @@ const styles = StyleSheet.create({
     margin: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  pinnedSection: {
+    marginTop: 8,
+    paddingHorizontal: 0,
+  },
+  pinnedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  pinnedTitle: {
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    opacity: 0.6,
+  },
+  pinnedItem: {
+    borderRadius: 12,
+    marginVertical: 2,
+    marginHorizontal: 12,
   },
 });

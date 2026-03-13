@@ -31,12 +31,15 @@ import { Screen } from '../components/Screen';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { useAppDispatch, useAppSelector } from '../store';
+import { togglePinFolder } from '../store/preferencesSlice';
 import { useListDirectoryQuery } from '../store/authApi';
 import { FoldersStackParamList } from '../navigation/DrawerNavigator';
 import { DirectoryFile, DirectoryFolder } from '../types/folders';
 
-const FolderItem = React.memo(({ folder, onPress }: { folder: DirectoryFolder; onPress: () => void }) => {
+const FolderItem = React.memo(({ folder, onPress, onLongPress }: { folder: DirectoryFolder; onPress: () => void; onLongPress: () => void }) => {
     const theme = useTheme();
+    const isPinned = useAppSelector(state => state.preferences.pinnedFolders?.some(f => f.path === folder.path) ?? false);
 
     return (
         <Card
@@ -51,10 +54,11 @@ const FolderItem = React.memo(({ folder, onPress }: { folder: DirectoryFolder; o
                 }
             ]}
             onPress={onPress}
+            onLongPress={onLongPress}
         >
             <Card.Content style={styles.cardContent}>
                 <View style={styles.itemInfoContainer}>
-                    <LucideIcon icon={FolderIcon} color={theme.colors.primary} size={28} />
+                    <LucideIcon icon={FolderIcon} color={isPinned ? '#3b82f6' : theme.colors.primary} size={28} />
                     <Text variant="bodyLarge" style={[styles.itemName, { color: theme.dark ? '#93c5fd' : '#1e40af' }]} numberOfLines={1}>{folder.name}</Text>
                 </View>
                 <ChevronRight size={28} color={theme.colors.onSurfaceVariant} />
@@ -164,6 +168,8 @@ const FileItem = React.memo(({ file, onPress }: { file: DirectoryFile; onPress: 
 
 export function FoldersScreen() {
     const theme = useTheme();
+    const dispatch = useAppDispatch();
+    const pinnedFolders = useAppSelector(state => state.preferences.pinnedFolders || []);
     const breadcrumbScrollViewRef = useRef<ScrollView>(null);
     const route = useRoute<RouteProp<FoldersStackParamList, 'Folders'>>();
     const navigation = useNavigation<NativeStackNavigationProp<FoldersStackParamList>>();
@@ -203,6 +209,23 @@ export function FoldersScreen() {
 
     const handleFolderPress = (folder: DirectoryFolder) => {
         navigation.push('Folders', { path: folder.path, name: folder.name });
+    };
+
+    const handleFolderLongPress = (folder: DirectoryFolder) => {
+        const isPinned = pinnedFolders.some(f => f.path === folder.path);
+        Alert.alert(
+            isPinned ? 'Unpin Folder' : 'Pin Folder',
+            `Do you want to ${isPinned ? 'unpin' : 'pin'} "${folder.name}" ${isPinned ? 'from' : 'to'} the sidebar?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: isPinned ? 'Unpin' : 'Pin',
+                    onPress: () => {
+                        dispatch(togglePinFolder({ path: folder.path, name: folder.name }));
+                    }
+                }
+            ]
+        );
     };
 
     const handleFilePress = async (file: DirectoryFile) => {
@@ -283,7 +306,13 @@ export function FoldersScreen() {
 
     const renderItem: ListRenderItem<any> = ({ item }) => {
         if (item.type === 'directory') {
-            return <FolderItem folder={item} onPress={() => handleFolderPress(item)} />;
+            return (
+                <FolderItem
+                    folder={item}
+                    onPress={() => handleFolderPress(item)}
+                    onLongPress={() => handleFolderLongPress(item)}
+                />
+            );
         }
         return <FileItem file={item} onPress={() => handleFilePress(item)} />;
     };
