@@ -13,7 +13,17 @@ import {
     FileQuestion
 } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, Linking, Alert } from 'react-native';
+import {
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
+    Linking,
+    Alert,
+    FlatList,
+    ListRenderItem,
+    Dimensions
+} from 'react-native';
 import { ActivityIndicator, Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,10 +42,10 @@ const FolderItem = React.memo(({ folder, onPress }: { folder: DirectoryFolder; o
     const theme = useTheme();
 
     return (
-        <Card mode="contained" style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={onPress}>
+        <Card mode="contained" style={[styles.card, { backgroundColor: theme.colors.surfaceVariant, opacity: 0.8 }]} onPress={onPress}>
             <Card.Content style={styles.cardContent}>
                 <View style={styles.itemInfoContainer}>
-                    <LucideIcon icon={FolderIcon} color={theme.colors.secondary} size={22} />
+                    <LucideIcon icon={FolderIcon} color={theme.colors.primary} size={20} />
                     <Text variant="bodyLarge" style={styles.itemName} numberOfLines={1}>{folder.name}</Text>
                 </View>
                 <ChevronRight size={16} color={theme.colors.onSurfaceVariant} />
@@ -185,6 +195,28 @@ export function FoldersScreen() {
         }
     };
 
+    const combinedData = useMemo(() => {
+        if (!data) return [];
+        return [
+            ...data.folders.map(f => ({ ...f, id: `folder-${f.path}` })),
+            ...data.files.map(f => ({ ...f, id: `file-${f.path}` }))
+        ];
+    }, [data]);
+
+    const renderItem: ListRenderItem<any> = ({ item }) => {
+        if (item.type === 'directory') {
+            return <FolderItem folder={item} onPress={() => handleFolderPress(item)} />;
+        }
+        return <FileItem file={item} onPress={() => handleFilePress(item)} />;
+    };
+
+    const ITEM_HEIGHT = 64; // Approximate height of each item (card + gap)
+    const getItemLayout = (_: any, index: number) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+    });
+
     return (
         <Screen style={{ backgroundColor: theme.colors.background }} scrollable={false} noPadding>
             <View style={styles.header}>
@@ -222,31 +254,29 @@ export function FoldersScreen() {
 
             <LoadingOverlay visible={isLoading || isFetching} message="Browsing..." />
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 24 }}>
-                {!path ? (
-                    <View style={styles.centerContent}>
-                        <LucideIcon icon={HardDrive} size={48} color={theme.colors.onSurfaceVariant} />
-                        <Text variant="bodyLarge" style={styles.infoText}>Select a drive from the Home screen to start browsing.</Text>
-                    </View>
-                ) : (
-                    <>
-                        {data?.folders.length === 0 && data?.files.length === 0 && !isLoading ? (
-                            <View style={styles.centerContent}>
-                                <Text variant="bodyMedium" style={{ opacity: 0.6 }}>This folder is empty.</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.list}>
-                                {data?.folders.map(folder => (
-                                    <FolderItem key={folder.path} folder={folder} onPress={() => handleFolderPress(folder)} />
-                                ))}
-                                {data?.files.map(file => (
-                                    <FileItem key={file.path} file={file} onPress={() => handleFilePress(file)} />
-                                ))}
-                            </View>
-                        )}
-                    </>
-                )}
-            </ScrollView>
+            {!path ? (
+                <View style={styles.centerContent}>
+                    <LucideIcon icon={HardDrive} size={48} color={theme.colors.onSurfaceVariant} />
+                    <Text variant="bodyLarge" style={styles.infoText}>Select a drive from the Home screen to start browsing.</Text>
+                </View>
+            ) : (
+                <FlatList
+                    data={combinedData}
+                    renderItem={renderItem}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.list}
+                    getItemLayout={getItemLayout}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    ListEmptyComponent={!isLoading ? (
+                        <View style={styles.centerContent}>
+                            <Text variant="bodyMedium" style={{ opacity: 0.6 }}>This folder is empty.</Text>
+                        </View>
+                    ) : null}
+                />
+            )}
 
             <ImageViewerModal
                 visible={viewerVisible}

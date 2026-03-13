@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Image, Dimensions, ActivityIndicator, Pressable, FlatList, ViewToken } from 'react-native';
-import { Modal, Portal, Text, useTheme } from 'react-native-paper';
+import { StyleSheet, View, Image, Dimensions, ActivityIndicator, Pressable, FlatList, ViewToken, StatusBar, Platform, Modal } from 'react-native';
+import { Portal, Text, useTheme } from 'react-native-paper';
 import { LucideIcon } from './LucideIcon';
 import { X } from 'lucide-react-native';
 import { DirectoryFile } from '../types/folders';
@@ -50,50 +50,62 @@ export function ImageViewerModal({ visible, onClose, images, initialIndex }: Pro
     if (!images || images.length === 0) return null;
 
     return (
-        <Portal>
-            <Modal
-                visible={visible}
-                onDismiss={onClose}
-                contentContainerStyle={styles.modal}
-            >
-                <View style={styles.container}>
-                    {headerVisible && (
-                        <View style={styles.header}>
-                            <Pressable onPress={onClose} style={styles.backButton}>
-                                <LucideIcon icon={X} color="#fff" size={24} />
-                            </Pressable>
-                            <View style={styles.titleContainer}>
-                                <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
-                                    {images[currentIndex]?.name}
-                                </Text>
-                                <Text variant="labelSmall" style={styles.subtitle}>
-                                    {currentIndex + 1} of {images.length}
-                                </Text>
-                            </View>
-                            <View style={{ width: 40 }} />
-                        </View>
-                    )}
+        <Modal
+            visible={visible}
+            onRequestClose={onClose}
+            animationType="fade"
+            transparent={false}
+            statusBarTranslucent={true}
+        >
+            <View style={styles.container}>
+                <StatusBar
+                    barStyle="light-content"
+                    backgroundColor="transparent"
+                    translucent={true}
+                    hidden={!headerVisible && visible}
+                />
 
-                    <FlatList
-                        ref={flatListRef}
-                        data={images}
-                        renderItem={renderItem}
-                        horizontal
-                        pagingEnabled
-                        keyExtractor={(item) => item.path}
-                        getItemLayout={(_, index) => ({
-                            length: width,
-                            offset: width * index,
-                            index,
-                        })}
-                        initialScrollIndex={initialIndex}
-                        onViewableItemsChanged={onViewableItemsChanged}
-                        viewabilityConfig={viewabilityConfig}
-                        showsHorizontalScrollIndicator={false}
-                    />
-                </View>
-            </Modal>
-        </Portal>
+                {headerVisible && (
+                    <View style={styles.header}>
+                        <Pressable onPress={onClose} style={styles.backButton}>
+                            <LucideIcon icon={X} color="#fff" size={24} />
+                        </Pressable>
+                        <View style={styles.titleContainer}>
+                            <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
+                                {images[currentIndex]?.name}
+                            </Text>
+                            <Text variant="labelSmall" style={styles.subtitle}>
+                                {currentIndex + 1} of {images.length}
+                            </Text>
+                        </View>
+                        <View style={{ width: 40 }} />
+                    </View>
+                )}
+
+                <FlatList
+                    ref={flatListRef}
+                    data={images}
+                    renderItem={renderItem}
+                    horizontal
+                    pagingEnabled
+                    keyExtractor={(item) => item.path}
+                    getItemLayout={(_, index) => ({
+                        length: width,
+                        offset: width * index,
+                        index,
+                    })}
+                    initialScrollIndex={initialIndex}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                    overScrollMode="never"
+                    bounces={false}
+                    removeClippedSubviews={true}
+                    scrollEventThrottle={16}
+                />
+            </View>
+        </Modal>
     );
 }
 
@@ -132,17 +144,13 @@ function ImageItem({ image, onPress }: { image: { path: string; name: string }; 
 }
 
 const styles = StyleSheet.create({
-    modal: {
-        flex: 1,
-        margin: 0,
-        backgroundColor: '#000',
-    },
     container: {
         flex: 1,
+        backgroundColor: '#000',
     },
     header: {
-        height: 60,
-        paddingTop: 10,
+        height: 100,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 44,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
