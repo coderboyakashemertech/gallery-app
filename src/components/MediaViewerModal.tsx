@@ -6,6 +6,7 @@ import { X, Share2, Download, Play, Pause } from 'lucide-react-native';
 import Share from 'react-native-share';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Video, { VideoRef } from 'react-native-video';
+import { SvgUri } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -263,6 +264,7 @@ function MediaItem({ item, onPress, isVisible, isNearby }: { item: { path: strin
 
     const ext = item.name.split('.').pop()?.toLowerCase() || '';
     const isVideo = ['mp4', 'm4v', 'mov', 'mkv', 'webm'].includes(ext);
+    const isSVG = ext === 'svg';
 
     useEffect(() => {
         if (!isVisible) {
@@ -311,6 +313,17 @@ function MediaItem({ item, onPress, isVisible, isNearby }: { item: { path: strin
                         <View style={styles.videoPlaceholder} />
                     )}
                 </View>
+            ) : isSVG ? (
+                <SvgUri
+                    uri={item.path}
+                    width="100%"
+                    height="100%"
+                    onLoad={() => setLoading(false)}
+                    onError={() => {
+                        setLoading(false);
+                        setError(true);
+                    }}
+                />
             ) : (
                 <Image
                     source={{ uri: item.path }}

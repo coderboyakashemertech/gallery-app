@@ -18,26 +18,21 @@ import {
     ScrollView,
     StyleSheet,
     View,
-    Linking,
     Alert,
     FlatList,
     ListRenderItem,
-    Dimensions,
     Platform
 } from 'react-native';
-import { ActivityIndicator, Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
+import { Card, IconButton, Text, useTheme } from 'react-native-paper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-
 import { LucideIcon } from '../components/LucideIcon';
 import { Screen } from '../components/Screen';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useListDirectoryQuery } from '../store/authApi';
-import { API_BASE_URL } from '../config/api';
-import { RootDrawerParamList, FoldersStackParamList } from '../navigation/DrawerNavigator';
+import { FoldersStackParamList } from '../navigation/DrawerNavigator';
 import { DirectoryFile, DirectoryFolder } from '../types/folders';
 
 const FolderItem = React.memo(({ folder, onPress }: { folder: DirectoryFolder; onPress: () => void }) => {
@@ -293,7 +288,7 @@ export function FoldersScreen() {
         return <FileItem file={item} onPress={() => handleFilePress(item)} />;
     };
 
-    const ITEM_HEIGHT = 64; // Approximate height of each item (card + gap)
+    const ITEM_HEIGHT = 88; // Precise height for 24px-padded cards + 8px gap
     const getItemLayout = (_: any, index: number) => ({
         length: ITEM_HEIGHT,
         offset: ITEM_HEIGHT * index,
@@ -354,10 +349,10 @@ export function FoldersScreen() {
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.list}
                     getItemLayout={getItemLayout}
-                    initialNumToRender={15}
+                    initialNumToRender={10}
                     maxToRenderPerBatch={10}
-                    windowSize={5}
-                    removeClippedSubviews={true}
+                    windowSize={10}
+                    removeClippedSubviews={Platform.OS === 'android'}
                     ListEmptyComponent={!isLoading ? (
                         <View style={styles.centerContent}>
                             <Text variant="bodyMedium" style={{ opacity: 0.6 }}>This folder is empty.</Text>
@@ -379,7 +374,6 @@ export function FoldersScreen() {
 const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 16,
-        paddingVertical: 8,
         flexDirection: 'row',
         alignItems: 'center',
         borderBottomWidth: 1,
@@ -400,6 +394,7 @@ const styles = StyleSheet.create({
     },
     list: {
         padding: 12,
+        paddingBottom: 80,
         gap: 8,
     },
     card: {
