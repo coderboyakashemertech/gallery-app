@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Image, Dimensions, ActivityIndicator, Pressable, FlatList, ViewToken, StatusBar, Platform, Modal } from 'react-native';
+import { StyleSheet, View, Image, Dimensions, ActivityIndicator, Pressable, FlatList, ViewToken, StatusBar, Platform, Modal, Alert } from 'react-native';
 import { Portal, Text, useTheme } from 'react-native-paper';
 import { LucideIcon } from './LucideIcon';
-import { X } from 'lucide-react-native';
+import { X, Share2 } from 'lucide-react-native';
+import Share from 'react-native-share';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { DirectoryFile } from '../types/folders';
 
 const { width, height } = Dimensions.get('window');
@@ -18,6 +20,7 @@ export function ImageViewerModal({ visible, onClose, images, initialIndex }: Pro
     const theme = useTheme();
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [headerVisible, setHeaderVisible] = useState(true);
+    const [sharing, setSharing] = useState(false);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -27,7 +30,47 @@ export function ImageViewerModal({ visible, onClose, images, initialIndex }: Pro
         }
     }, [visible, initialIndex]);
 
-    const toggleHeader = () => setHeaderVisible(prev => !prev);
+    const toggleHeader = () => setHeaderVisible((prev: boolean) => !prev);
+
+    const handleShare = async () => {
+        const currentImage = images[currentIndex];
+        if (!currentImage || sharing) return;
+
+        setSharing(true);
+        const fileName = currentImage.name || 'image.jpg';
+        const fileExt = fileName.split('.').pop() || 'jpg';
+        const tempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/share_${Date.now()}.${fileExt}`;
+
+        try {
+            // Download the file
+            const res = await ReactNativeBlobUtil
+                .config({ path: tempPath })
+                .fetch('GET', currentImage.path);
+
+            const localFilePath = res.path();
+
+            // Share the local file
+            await Share.open({
+                url: `file://${localFilePath}`,
+                type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+                title: currentImage.name,
+                message: currentImage.name,
+            });
+
+            // Cleanup
+            setTimeout(() => {
+                ReactNativeBlobUtil.fs.unlink(localFilePath).catch(e => console.log('Cleanup error:', e));
+            }, 1000);
+
+        } catch (error: any) {
+            if (error?.message !== 'User did not share') {
+                console.error('Error sharing image:', error);
+                Alert.alert('Share Error', 'Could not prepare image for sharing.');
+            }
+        } finally {
+            setSharing(false);
+        }
+    };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
         if (viewableItems.length > 0) {
@@ -104,6 +147,25 @@ export function ImageViewerModal({ visible, onClose, images, initialIndex }: Pro
                     removeClippedSubviews={true}
                     scrollEventThrottle={16}
                 />
+
+                {headerVisible && (
+                    <View style={styles.footer}>
+                        <Pressable
+                            onPress={handleShare}
+                            style={[styles.shareButton, sharing && { opacity: 0.7 }]}
+                            disabled={sharing}
+                        >
+                            {sharing ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <LucideIcon icon={Share2} color="#fff" size={20} />
+                            )}
+                            <Text style={styles.shareText}>
+                                {sharing ? 'Preparing...' : 'Share Image'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
             </View>
         </Modal>
     );
@@ -187,6 +249,32 @@ const styles = StyleSheet.create({
     image: {
         width: width,
         height: height,
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 100,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+        zIndex: 10,
+    },
+    shareButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 24,
+        gap: 8,
+    },
+    shareText: {
+        color: '#fff',
+        fontWeight: '600',
     },
     loader: {
         position: 'absolute',
