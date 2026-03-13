@@ -6,27 +6,63 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import 'react-native-gesture-handler/jestSetup';
 
+jest.mock('@env', () => ({
+  APP_ENV: 'test',
+  API_BASE_URL_ANDROID: 'http://10.0.2.2:3000',
+  API_BASE_URL_IOS: 'http://127.0.0.1:3000',
+  API_BASE_URL_DEFAULT: 'http://127.0.0.1:3000',
+}), { virtual: true });
+
+jest.mock('react-native-reanimated', () =>
+  require('react-native-reanimated/mock'),
+);
+
+jest.mock('@react-navigation/drawer', () => {
+  return {
+    createDrawerNavigator: () => {
+      const Navigator = ({ children }: { children: React.ReactNode }) => children;
+      const Screen = ({ children }: { children?: React.ReactNode }) => children ?? null;
+      return { Navigator, Screen };
+    },
+    DrawerContentScrollView: ({ children }: { children: React.ReactNode }) => children,
+    DrawerItemList: () => null,
+  };
+});
+
 jest.mock('../src/store', () => {
+  const mockState = {
+    auth: {
+      token: null,
+    },
+    preferences: {
+      isDarkMode: false,
+    },
+  };
+
   return {
     store: {
-      getState: () => ({
-        gallery: {
-          featuredCount: 12,
-          welcomeMessage: 'Test welcome message',
-        },
-      }),
+      getState: () => mockState,
       subscribe: () => () => {},
       dispatch: jest.fn(),
     },
+    useAppSelector: (selector: (state: typeof mockState) => unknown) =>
+      selector(mockState),
+  };
+});
+
+jest.mock('../src/screens/AuthScreen', () => {
+  const { Text } = require('react-native');
+
+  return {
+    AuthScreen: () => <Text>Auth Ready</Text>,
   };
 });
 
 jest.mock('../src/navigation/DrawerNavigator', () => {
-  const mockReact = require('react');
   const { Text } = require('react-native');
 
   return {
-    DrawerNavigator: () => mockReact.createElement(Text, null, 'Drawer Ready'),
+    DrawerNavigator: () => <Text>Drawer Ready</Text>,
   };
 });
 

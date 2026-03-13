@@ -1,4 +1,25 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+This is a React Native file manager client for the Gallery project.
+
+# Environment
+
+The app reads its API configuration from [`app/.env`](/home/coderboy/projects/Gallery/app/.env).
+Start from [`app/.env.example`](/home/coderboy/projects/Gallery/app/.env.example).
+
+Available variables:
+
+- `APP_ENV`: simple app environment label shown in the UI.
+- `API_BASE_URL_ANDROID`: API URL used on Android.
+- `API_BASE_URL_IOS`: API URL used on iOS.
+- `API_BASE_URL_DEFAULT`: fallback URL for other platforms.
+
+Default local values:
+
+- Android emulator: `http://10.0.2.2:3000`
+- iOS simulator: `http://127.0.0.1:3000`
+
+If you run the app on a physical device, replace these with your machine's LAN IP, for example `http://192.168.1.25:3000`.
+
+After changing `.env`, restart Metro so Babel picks up the new values.
 
 # Getting Started
 

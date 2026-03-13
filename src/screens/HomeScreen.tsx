@@ -1,143 +1,195 @@
-import { Camera, ChevronRight, LayoutGrid, Sparkles } from 'lucide-react-native';
+import { HardDrive, RefreshCcw } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Card, Chip, Surface, Text } from 'react-native-paper';
+import { ActivityIndicator, Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 
 import { LucideIcon } from '../components/LucideIcon';
+import { Screen } from '../components/Screen';
+import { LoadingOverlay } from '../components/LoadingOverlay';
+import { useGetDrivesQuery } from '../store/authApi';
 import { useAppSelector } from '../store';
-import { appTheme } from '../theme';
+import { Drive } from '../types/drives';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { RootDrawerParamList } from '../navigation/DrawerNavigator';
 
-const quickStats = [
-  {
-    title: 'Featured works',
-    value: '128',
-    icon: LayoutGrid,
-  },
-  {
-    title: 'New arrivals',
-    value: '24',
-    icon: Sparkles,
-  },
-  {
-    title: 'Studio shots',
-    value: '09',
-    icon: Camera,
-  },
-];
-
-function FeaturedChipIcon({ size, color }: { size: number; color: string }) {
-  return <LucideIcon icon={Sparkles} size={size} color={color} />;
-}
-
-export function HomeScreen() {
-  const welcomeMessage = useAppSelector(state => state.gallery.welcomeMessage);
-  const featuredCount = useAppSelector(state => state.gallery.featuredCount);
+const DriveCard = React.memo(({ drive, onPress }: { drive: Drive; onPress: () => void }) => {
+  const theme = useTheme();
 
   return (
-    <View style={styles.screen}>
-      <Surface style={styles.hero} elevation={1}>
-        <Text variant="headlineMedium" style={styles.heroTitle}>
-          Gallery Home
-        </Text>
-        <Text variant="bodyLarge" style={styles.heroBody}>
-          {welcomeMessage}
-        </Text>
-        <View style={styles.chipRow}>
-          <Chip icon={FeaturedChipIcon}>
-            {featuredCount} featured picks
-          </Chip>
-          <Chip compact>Paper UI</Chip>
-          <Chip compact>Redux state</Chip>
+    <Card mode="contained" style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={onPress}>
+      <Card.Content style={styles.cardContent}>
+        <View style={styles.driveTextContainer}>
+          <Text variant="titleMedium" style={{ fontWeight: '700' }}>{drive.name}</Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={1}>
+            {drive.path}
+          </Text>
         </View>
-      </Surface>
+        <View
+          style={[
+            styles.iconBadge,
+            { backgroundColor: theme.colors.primaryContainer },
+          ]}>
+          <LucideIcon icon={HardDrive} color={theme.colors.primary} size={22} />
+        </View>
+      </Card.Content>
+    </Card>
+  );
+});
 
-      {quickStats.map(item => (
-        <Card key={item.title} mode="contained" style={styles.card}>
-          <Card.Content style={styles.cardContent}>
-            <View>
-              <Text variant="titleMedium">{item.title}</Text>
-              <Text variant="displaySmall" style={styles.statValue}>
-                {item.value}
-              </Text>
-            </View>
-            <View style={styles.iconBadge}>
-              <LucideIcon icon={item.icon} color={appTheme.colors.primary} size={22} />
-            </View>
-          </Card.Content>
-        </Card>
-      ))}
+export function HomeScreen() {
+  const user = useAppSelector(state => state.auth.user);
+  const { data: drives, isLoading: isLoadingDrives, refetch, isFetching: isRefreshing } = useGetDrivesQuery();
+  const theme = useTheme();
+  const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
 
-      <Card mode="elevated" style={styles.ctaCard}>
-        <Card.Content style={styles.ctaRow}>
-          <View style={styles.ctaText}>
-            <Text variant="titleMedium">Start building the next screen</Text>
-            <Text variant="bodyMedium">
-              This boilerplate is ready for new routes, async slices, and themed components.
+  const handleDrivePress = (drive: Drive) => {
+    navigation.navigate('FoldersStack', {
+      screen: 'Folders',
+      params: { path: drive.path, name: drive.name }
+    });
+  };
+
+  return (
+    <Screen style={{ backgroundColor: theme.colors.background }}>
+      <LoadingOverlay visible={isLoadingDrives} message="Connecting to drives..." />
+      <View style={styles.heroContainer}>
+        <Surface style={[styles.hero, { backgroundColor: theme.colors.primaryContainer }]} elevation={5}>
+          <View style={styles.heroContent}>
+            <Text
+              variant="headlineSmall"
+              style={[styles.greeting, { color: theme.colors.primary }]}>
+              Hello,
+            </Text>
+            <Text
+              variant="headlineLarge"
+              style={[styles.userName, { color: theme.colors.onPrimaryContainer }]}>
+              {user?.name ?? 'Guest'}
+            </Text>
+            <Text
+              variant="bodyMedium"
+              style={[styles.heroSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Your connected storage is ready.
             </Text>
           </View>
-          <LucideIcon icon={ChevronRight} color={appTheme.colors.primary} size={22} />
-        </Card.Content>
-      </Card>
-    </View>
+        </Surface>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.sectionHeader}>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+            CONNECTED DRIVES
+          </Text>
+          <IconButton
+            icon={({ size }) => <LucideIcon icon={RefreshCcw} size={size} color={theme.colors.primary} />}
+            size={24}
+            onPress={refetch}
+            disabled={isRefreshing}
+            style={{ margin: 0 }}
+          />
+        </View>
+
+        {drives && drives.length > 0 ? (
+          <View style={styles.driveList}>
+            {drives.map(drive => (
+              <DriveCard
+                key={drive.path}
+                drive={drive}
+                onPress={() => handleDrivePress(drive)}
+              />
+            ))}
+          </View>
+        ) : !isLoadingDrives && (
+          <View style={styles.centerContent}>
+            <LucideIcon icon={HardDrive} size={48} color={theme.colors.onSurfaceVariant} />
+            <Text variant="bodyLarge" style={styles.infoText}>No connected drives found.</Text>
+          </View>
+        )}
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    gap: 16,
-    padding: 20,
+  heroContainer: {
+    marginBottom: 24,
   },
   hero: {
-    borderRadius: 24,
-    gap: 14,
-    padding: 20,
+    borderRadius: 32,
+    overflow: 'hidden',
+    padding: 24,
+    minHeight: 200,
+    justifyContent: 'center',
   },
-  heroTitle: {
-    color: appTheme.colors.onSurface,
+  heroContent: {
+    gap: 4,
+  },
+  greeting: {
+    fontWeight: '400',
+    letterSpacing: -0.5,
+    marginBottom: -4,
+  },
+  userName: {
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  heroBody: {
-    color: appTheme.colors.onSurfaceVariant,
-    lineHeight: 24,
+  heroSubtitle: {
+    marginTop: 8,
+    opacity: 0.7,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  content: {
+    flex: 1,
+    paddingHorizontal: 8,
   },
   card: {
-    backgroundColor: appTheme.colors.surface,
+    borderRadius: 16,
+    marginBottom: 10,
   },
   cardContent: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  statValue: {
-    color: appTheme.colors.primary,
-    fontWeight: '700',
-    marginTop: 6,
+    padding: 14,
   },
   iconBadge: {
     alignItems: 'center',
-    backgroundColor: appTheme.colors.primaryContainer,
-    borderRadius: 16,
-    height: 44,
+    borderRadius: 10,
+    height: 36,
     justifyContent: 'center',
-    width: 44,
+    width: 36,
   },
-  ctaCard: {
-    marginTop: 'auto',
+  sectionTitle: {
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    fontSize: 11,
+    opacity: 0.6,
   },
-  ctaRow: {
-    alignItems: 'center',
+  sectionHeader: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  ctaText: {
+  driveList: {
+    gap: 8,
+  },
+  loadingText: {
+    opacity: 0.6,
+    textAlign: 'center',
+  },
+  infoText: {
+    textAlign: 'center',
+    opacity: 0.6,
+  },
+  driveTextContainer: {
     flex: 1,
-    gap: 4,
+    marginRight: 10,
+    gap: 2,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
   },
 });
