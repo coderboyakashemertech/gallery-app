@@ -61,7 +61,8 @@ export function LoginScreen({ onCreateAccount }: Props) {
         username: username.trim().toLowerCase(),
         otp: code,
       }).unwrap();
-    } catch {
+    } catch (err) {
+      console.log(err);
       // Errors are stored in Redux by the auth slice.
     }
   };
@@ -123,7 +124,7 @@ export function LoginScreen({ onCreateAccount }: Props) {
             setPassword(value);
           }}
           onSubmitEditing={() => {
-            onSubmit().catch(() => {});
+            onSubmit().catch(() => { });
           }}
           outlineColor="transparent"
           outlineStyle={styles.noOutline}
@@ -203,7 +204,7 @@ export function LoginScreen({ onCreateAccount }: Props) {
         labelStyle={styles.buttonLabel}
         mode="contained"
         onPress={() => {
-          onSubmit().catch(() => {});
+          onSubmit().catch(() => { });
         }}
         style={styles.primaryButton}
       >

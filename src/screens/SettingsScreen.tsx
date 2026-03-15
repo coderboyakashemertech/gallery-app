@@ -60,6 +60,7 @@ export function SettingsScreen() {
   const { error, requestStatus, twoFactorSetup, user } = useAppSelector(
     state => state.auth,
   );
+  console.log('🚀 ~ SettingsScreen ~ twoFactorSetup:', twoFactorSetup?.secret);
   const token = useAppSelector(state => state.auth.token);
   const isDarkMode = useAppSelector(state => state.preferences.isDarkMode);
   const [enableOtp, setEnableOtp] = useState('');
@@ -75,12 +76,14 @@ export function SettingsScreen() {
   const onStart2FA = async () => {
     dispatch(clearAuthError());
     setEnableOtp('');
-    await beginTwoFactorSetup().unwrap();
+    const res = await beginTwoFactorSetup().unwrap();
+    console.log(res?.qrCodeDataUrl)
   };
 
   const onVerify2FA = async () => {
     dispatch(clearAuthError());
-    await verifyTwoFactorSetup({ otp: enableOtp }).unwrap();
+    const res = await verifyTwoFactorSetup({ otp: enableOtp }).unwrap();
+    // console.log('🚀 ~ onVerify2FA ~ res:', res);
   };
 
   const onDisable2FA = async () => {
@@ -102,7 +105,9 @@ export function SettingsScreen() {
   };
 
   const onPressVerify2FA = () => {
-    onVerify2FA().catch(() => { });
+    onVerify2FA().catch(err => {
+      console.log(err);
+    });
   };
 
   const onPressDisable2FA = () => {
@@ -113,7 +118,9 @@ export function SettingsScreen() {
     <Screen>
       <Card mode="contained" style={styles.card}>
         <Card.Content style={styles.section}>
-          <Text variant="headlineSmall" style={{ fontWeight: '700' }}>Settings</Text>
+          <Text variant="headlineSmall" style={{ fontWeight: '700' }}>
+            Settings
+          </Text>
           <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
             Manage your account preferences and security settings.
           </Text>
@@ -122,11 +129,15 @@ export function SettingsScreen() {
 
       <Card mode="contained" style={styles.card}>
         <Card.Content style={styles.section}>
-          <Text variant="titleMedium" style={{ fontWeight: '700' }}>Appearance</Text>
+          <Text variant="titleMedium" style={{ fontWeight: '700' }}>
+            Appearance
+          </Text>
           <View style={styles.row}>
             <View style={styles.rowText}>
               <Text variant="bodyLarge">Dark mode</Text>
-              <Text variant="bodySmall" style={{ opacity: 0.6 }}>Adjust the app's visual theme.</Text>
+              <Text variant="bodySmall" style={{ opacity: 0.6 }}>
+                Adjust the app's visual theme.
+              </Text>
             </View>
             <Switch
               value={isDarkMode}
@@ -140,7 +151,9 @@ export function SettingsScreen() {
 
       <Card mode="contained" style={styles.card}>
         <Card.Content style={styles.section}>
-          <Text variant="titleMedium" style={{ fontWeight: '700' }}>Profile</Text>
+          <Text variant="titleMedium" style={{ fontWeight: '700' }}>
+            Profile
+          </Text>
           <List.Item
             title={user?.name ?? 'Unknown user'}
             description="Display name"
@@ -165,7 +178,8 @@ export function SettingsScreen() {
             mode="outlined"
             onPress={onRefreshProfile}
             disabled={isBusy}
-            style={{ borderRadius: 12 }}>
+            style={{ borderRadius: 12 }}
+          >
             Refresh profile
           </Button>
         </Card.Content>
@@ -173,17 +187,21 @@ export function SettingsScreen() {
 
       <Card mode="contained" style={styles.card}>
         <Card.Content style={styles.section}>
-          <Text variant="titleMedium" style={{ fontWeight: '700' }}>Security (2FA)</Text>
+          <Text variant="titleMedium" style={{ fontWeight: '700' }}>
+            Security (2FA)
+          </Text>
           {!user?.twoFactorEnabled ? (
             <>
               <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
-                Enhance your account security by enabling Two-Factor Authentication.
+                Enhance your account security by enabling Two-Factor
+                Authentication.
               </Text>
               <Button
                 mode="contained"
                 onPress={onPressStart2FA}
                 disabled={isBusy}
-                style={{ borderRadius: 12 }}>
+                style={{ borderRadius: 12 }}
+              >
                 Start 2FA setup
               </Button>
               {twoFactorSetup ? (
@@ -192,7 +210,11 @@ export function SettingsScreen() {
                     source={{ uri: twoFactorSetup.qrCodeDataUrl }}
                     style={styles.qrCode}
                   />
-                  <Text selectable variant="bodySmall" style={{ textAlign: 'center', opacity: 0.6 }}>
+                  <Text
+                    selectable
+                    variant="bodySmall"
+                    style={{ textAlign: 'center', opacity: 0.6 }}
+                  >
                     Secret: {twoFactorSetup.secret}
                   </Text>
                   <TextInput
@@ -208,7 +230,8 @@ export function SettingsScreen() {
                     mode="contained-tonal"
                     onPress={onPressVerify2FA}
                     disabled={isBusy}
-                    style={{ borderRadius: 12 }}>
+                    style={{ borderRadius: 12 }}
+                  >
                     Verify and enable
                   </Button>
                 </>
@@ -232,7 +255,8 @@ export function SettingsScreen() {
                 mode="contained-tonal"
                 onPress={onPressDisable2FA}
                 disabled={isBusy}
-                style={{ borderRadius: 12 }}>
+                style={{ borderRadius: 12 }}
+              >
                 Disable 2FA
               </Button>
             </>
@@ -246,7 +270,8 @@ export function SettingsScreen() {
         mode="outlined"
         onPress={onLogout}
         style={[styles.logoutBtn, { borderColor: theme.colors.outlineVariant }]}
-        textColor={theme.colors.error}>
+        textColor={theme.colors.error}
+      >
         Logout
       </Button>
     </Screen>

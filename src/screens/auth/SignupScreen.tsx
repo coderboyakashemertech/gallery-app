@@ -90,7 +90,8 @@ export function SignupScreen({ onGoToLogin }: Props) {
         password,
         username: username.trim().toLowerCase(),
       }).unwrap();
-    } catch {
+    } catch (error) {
+      console.log(error);
       // Errors are handled by auth slice state.
     }
   };
@@ -115,6 +116,7 @@ export function SignupScreen({ onGoToLogin }: Props) {
             setName(value);
           }}
           outlineColor="transparent"
+          outlineStyle={styles.noOutline}
           placeholder="Enter your name"
           style={[
             styles.field,
@@ -135,13 +137,13 @@ export function SignupScreen({ onGoToLogin }: Props) {
           autoCorrect={false}
           contentStyle={styles.inputContent}
           disabled={isBusy}
-          left={<TextInput.Affix text="@" />}
           mode="outlined"
           onChangeText={value => {
             clearErrorIfNeeded();
             setUsername(value);
           }}
           outlineColor="transparent"
+          outlineStyle={styles.noOutline}
           placeholder="Choose a username"
           style={[
             styles.field,
@@ -167,6 +169,7 @@ export function SignupScreen({ onGoToLogin }: Props) {
             setPassword(value);
           }}
           outlineColor="transparent"
+          outlineStyle={styles.noOutline}
           placeholder="Create a password"
           right={
             <TextInput.Icon
@@ -199,6 +202,7 @@ export function SignupScreen({ onGoToLogin }: Props) {
             setConfirmPassword(value);
           }}
           outlineColor="transparent"
+          outlineStyle={styles.noOutline}
           placeholder="Repeat your password"
           right={
             <TextInput.Icon
@@ -251,7 +255,7 @@ export function SignupScreen({ onGoToLogin }: Props) {
         labelStyle={styles.buttonLabel}
         mode="contained"
         onPress={() => {
-          onSubmit().catch(() => {});
+          onSubmit().catch(() => { });
         }}
         style={styles.primaryButton}>
         {isBusy ? 'Creating account...' : 'Create account'}
@@ -335,5 +339,8 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontWeight: '700',
+  },
+  noOutline: {
+    borderWidth: 0,
   },
 });
