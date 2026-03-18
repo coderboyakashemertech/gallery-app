@@ -51,6 +51,7 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { LucideIcon } from '../components/LucideIcon';
 import { MediaViewerModal } from '../components/MediaViewerModal';
+import { VideoViewerModal } from '../components/VideoViewerModal';
 import { Screen } from '../components/Screen';
 import { FoldersStackParamList } from '../navigation/DrawerNavigator';
 import {
@@ -449,10 +450,13 @@ export function FoldersScreen() {
   );
 
   const [viewerVisible, setViewerVisible] = React.useState(false);
-  const [mediaList, setMediaList] = React.useState<
-    { path: string; name: string }[]
-  >([]);
+  const [mediaList, setMediaList] = React.useState<{ path: string; name: string }[]>([]);
   const [selectedMediaIndex, setSelectedMediaIndex] = React.useState(0);
+  const [videoViewerVisible, setVideoViewerVisible] = React.useState(false);
+  const [selectedVideo, setSelectedVideo] = React.useState<{
+    path: string;
+    name: string;
+  } | null>(null);
   const [preparingFile, setPreparingFile] = React.useState(false);
   const [downloadingItem, setDownloadingItem] = React.useState(false);
   const [sharingItem, setSharingItem] = React.useState(false);
@@ -567,7 +571,13 @@ export function FoldersScreen() {
       return;
     }
 
-    if (isVideo || ext === '.svg') {
+    if (isVideo) {
+      setSelectedVideo({ path: file.url, name: file.name });
+      setVideoViewerVisible(true);
+      return;
+    }
+
+    if (ext === '.svg') {
       await openFileExternally(file, ext);
       return;
     }
@@ -932,6 +942,11 @@ export function FoldersScreen() {
         onClose={() => setViewerVisible(false)}
         media={mediaList}
         initialIndex={selectedMediaIndex}
+      />
+      <VideoViewerModal
+        visible={videoViewerVisible}
+        onClose={() => setVideoViewerVisible(false)}
+        video={selectedVideo}
       />
 
       <Portal>

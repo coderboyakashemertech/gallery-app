@@ -54,7 +54,7 @@ type Props = {
 };
 
 type ZoomableImageProps = {
-  uri: string;
+  item: MediaItem;
   width: number;
   height: number;
   isActive: boolean;
@@ -95,7 +95,7 @@ const ZOOM_TIMING_CONFIG = {
 const DOUBLE_TAP_ZOOM_LEVELS = [2, 3, 4];
 
 function ZoomableImage({
-  uri,
+  item,
   width,
   height,
   isActive,
@@ -133,7 +133,7 @@ function ZoomableImage({
 
   useEffect(() => {
     setIsLoading(true);
-  }, [uri]);
+  }, [item.path]);
 
   const pinchGesture = Gesture.Pinch()
     .onStart(() => {
@@ -262,7 +262,7 @@ function ZoomableImage({
       <GestureDetector gesture={composedGesture}>
         <Animated.View style={animatedStyle}>
           <Image
-            source={{ uri }}
+            source={{ uri: item.path }}
             style={[styles.image, { width, height }]}
             resizeMode="contain"
             onLoadStart={() => {
@@ -591,7 +591,7 @@ export function MediaViewerModal({
 
   const renderItem = ({ item, index }: ListRenderItemInfo<MediaItem>) => (
     <ZoomableImage
-      uri={item.path}
+      item={item}
       width={width}
       height={height}
       isActive={index === currentIndex}
