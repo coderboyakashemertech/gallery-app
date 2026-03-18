@@ -1,14 +1,7 @@
-import { HardDrive, RefreshCcw } from 'lucide-react-native';
+import { FolderOpen, HardDrive, Pin, RefreshCcw } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import {
-  ActivityIndicator,
-  Card,
-  IconButton,
-  Surface,
-  Text,
-  useTheme,
-} from 'react-native-paper';
+import { Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 
 import { LucideIcon } from '../components/LucideIcon';
 import { Screen } from '../components/Screen';
@@ -62,16 +55,70 @@ const DriveCard = React.memo(
   },
 );
 
+const PinnedFolderCard = React.memo(
+  ({ name, onPress }: { name: string; onPress: () => void }) => {
+    const theme = useTheme();
+
+    return (
+      <Card
+        mode="contained"
+        style={[
+          styles.card,
+          styles.pinnedCard,
+          {
+            backgroundColor: theme.dark
+              ? 'rgba(31, 111, 91, 0.14)'
+              : 'rgba(31, 111, 91, 0.08)',
+          },
+        ]}
+        onPress={onPress}
+      >
+        <Card.Content style={styles.cardContent}>
+          <View style={styles.driveTextContainer}>
+            <Text variant="titleMedium" style={styles.pinnedName}>
+              {name}
+            </Text>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+              numberOfLines={1}
+            >
+              Quick access to your pinned folder
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.iconBadge,
+              {
+                backgroundColor: theme.dark
+                  ? 'rgba(31, 111, 91, 0.22)'
+                  : theme.colors.primaryContainer,
+              },
+            ]}
+          >
+            <LucideIcon
+              icon={FolderOpen}
+              color={theme.colors.primary}
+              size={22}
+            />
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  },
+);
+
 export function HomeScreen() {
   const user = useAppSelector(state => state.auth.user);
+  const pinnedFolders = useAppSelector(
+    state => state.preferences.pinnedFolders || [],
+  );
   const {
     data: drives,
     isLoading: isLoadingDrives,
     refetch,
     isFetching: isRefreshing,
-    error,
   } = useGetDrivesQuery();
-  console.log('🚀 ~ HomeScreen ~ error:', drives);
   const theme = useTheme();
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
 
@@ -79,6 +126,13 @@ export function HomeScreen() {
     navigation.navigate('FoldersStack', {
       screen: 'Folders',
       params: { path: drive.path, name: drive.name },
+    });
+  };
+
+  const handlePinnedFolderPress = (folder: { path: string; name: string }) => {
+    navigation.navigate('FoldersStack', {
+      screen: 'Folders',
+      params: { path: folder.path, name: folder.name },
     });
   };
 
@@ -126,51 +180,80 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.sectionHeader}>
-          <Text
-            variant="titleMedium"
-            style={[styles.sectionTitle, { color: theme.colors.primary }]}
-          >
-            CONNECTED DRIVES
-          </Text>
-          <IconButton
-            icon={({ size }) => (
-              <LucideIcon
-                icon={RefreshCcw}
-                size={size}
-                color={theme.colors.primary}
-              />
-            )}
-            size={24}
-            onPress={refetch}
-            disabled={isRefreshing}
-            style={{ margin: 0 }}
-          />
-        </View>
-
-        {drives && drives.length > 0 ? (
-          <View style={styles.driveList}>
-            {drives.map(drive => (
-              <DriveCard
-                key={drive.path}
-                drive={drive}
-                onPress={() => handleDrivePress(drive)}
-              />
-            ))}
-          </View>
-        ) : (
-          !isLoadingDrives && (
-            <View style={styles.centerContent}>
-              <LucideIcon
-                icon={HardDrive}
-                size={48}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text variant="bodyLarge" style={styles.infoText}>
-                No connected drives found.
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text
+                variant="titleMedium"
+                style={[styles.sectionTitle, { color: theme.colors.primary }]}
+              >
+                CONNECTED DRIVES
               </Text>
             </View>
-          )
+            <IconButton
+              icon={({ size }) => (
+                <LucideIcon
+                  icon={RefreshCcw}
+                  size={size}
+                  color={theme.colors.primary}
+                />
+              )}
+              size={24}
+              onPress={refetch}
+              disabled={isRefreshing}
+              style={{ margin: 0 }}
+            />
+          </View>
+
+          {drives && drives.length > 0 ? (
+            <View style={styles.driveList}>
+              {drives.map(drive => (
+                <DriveCard
+                  key={drive.path}
+                  drive={drive}
+                  onPress={() => handleDrivePress(drive)}
+                />
+              ))}
+            </View>
+          ) : (
+            !isLoadingDrives && (
+              <View style={styles.centerContent}>
+                <LucideIcon
+                  icon={HardDrive}
+                  size={48}
+                  color={theme.colors.onSurfaceVariant}
+                />
+                <Text variant="bodyLarge" style={styles.infoText}>
+                  No connected drives found.
+                </Text>
+              </View>
+            )
+          )}
+        </View>
+        {pinnedFolders.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <LucideIcon icon={Pin} size={14} color={theme.colors.primary} />
+                <Text
+                  variant="titleMedium"
+                  style={[styles.sectionTitle, { color: theme.colors.primary }]}
+                >
+                  PINNED FOLDERS
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.driveList}>
+              {pinnedFolders.map(folder => (
+                <PinnedFolderCard
+                  key={folder.path}
+                  name={folder.name}
+                  onPress={() => handlePinnedFolderPress(folder)}
+                />
+              ))}
+            </View>
+          </View>
         )}
       </View>
     </Screen>
@@ -208,9 +291,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 8,
   },
+  section: {
+    marginBottom: 18,
+  },
   card: {
     borderRadius: 16,
     marginBottom: 10,
+  },
+  pinnedCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(31, 111, 91, 0.18)',
   },
   cardContent: {
     alignItems: 'center',
@@ -237,6 +327,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   driveList: {
     gap: 8,
   },
@@ -252,6 +347,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
     gap: 2,
+  },
+  pinnedName: {
+    fontWeight: '700',
   },
   centerContent: {
     flex: 1,

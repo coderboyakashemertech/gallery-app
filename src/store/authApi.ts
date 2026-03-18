@@ -54,7 +54,7 @@ const baseQuery: BaseQueryFn<
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery,
-  tagTypes: ['Profile'],
+  tagTypes: ['Profile', 'Directory'],
   endpoints: builder => ({
     register: builder.mutation<
       AuthPayload,
@@ -113,6 +113,18 @@ export const authApi = createApi({
     }),
     listDirectory: builder.query<DirectoryContentsResponse, { path: string }>({
       query: ({ path }) => `/api/drives/list?path=${path}`,
+      providesTags: (_result, _error, { path }) => [{ type: 'Directory', id: path || 'root' }],
+    }),
+    moveItemToRecycleBin: builder.mutation<
+      { moved: boolean; name: string; path: string; recyclePath: string; type: 'directory' | 'file' },
+      { path: string; currentPath?: string }
+    >({
+      query: body => ({
+        url: '/api/drives/recycle',
+        method: 'POST',
+        body: { path: body.path },
+      }),
+      invalidatesTags: (_result, _error, { currentPath }) => [{ type: 'Directory', id: currentPath || 'root' }],
     }),
   }),
 });
@@ -123,6 +135,7 @@ export const {
   useGetDrivesQuery,
   useGetGalleryFoldersQuery,
   useListDirectoryQuery,
+  useMoveItemToRecycleBinMutation,
   useGetProfileQuery,
   useLazyGetProfileQuery,
   useLoginMutation,

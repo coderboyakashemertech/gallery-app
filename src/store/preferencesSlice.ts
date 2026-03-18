@@ -5,14 +5,18 @@ export type PinnedFolder = {
   name: string;
 };
 
+export type FolderViewMode = 'grid' | 'list';
+
 type PreferencesState = {
   isDarkMode: boolean;
   pinnedFolders: PinnedFolder[];
+  folderViewMode: FolderViewMode;
 };
 
 const initialState: PreferencesState = {
   isDarkMode: false,
   pinnedFolders: [],
+  folderViewMode: 'grid',
 };
 
 const preferencesSlice = createSlice({
@@ -21,6 +25,9 @@ const preferencesSlice = createSlice({
   reducers: {
     toggleDarkMode(state) {
       state.isDarkMode = !state.isDarkMode;
+    },
+    setFolderViewMode(state, action: { payload: FolderViewMode }) {
+      state.folderViewMode = action.payload;
     },
     togglePinFolder(state, action: { payload: PinnedFolder }) {
       if (!state.pinnedFolders) {
@@ -37,5 +44,5 @@ const preferencesSlice = createSlice({
   },
 });
 
-export const { toggleDarkMode, togglePinFolder } = preferencesSlice.actions;
+export const { toggleDarkMode, setFolderViewMode, togglePinFolder } = preferencesSlice.actions;
 export default preferencesSlice.reducer;
