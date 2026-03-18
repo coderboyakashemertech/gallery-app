@@ -46,3 +46,33 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 #endif
   }
 }
+
+@objc(ImageClipboardModule)
+class ImageClipboardModule: NSObject, RCTBridgeModule {
+  static func moduleName() -> String! {
+    "ImageClipboardModule"
+  }
+
+  static func requiresMainQueueSetup() -> Bool {
+    false
+  }
+
+  @objc(copyImage:resolver:rejecter:)
+  func copyImage(
+    _ path: String,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    let normalizedPath = path.replacingOccurrences(of: "file://", with: "")
+
+    DispatchQueue.main.async {
+      guard let image = UIImage(contentsOfFile: normalizedPath) else {
+        reject("E_COPY_IMAGE", "Unable to load image from path.", nil)
+        return
+      }
+
+      UIPasteboard.general.image = image
+      resolve(true)
+    }
+  }
+}

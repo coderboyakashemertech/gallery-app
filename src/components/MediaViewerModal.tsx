@@ -28,9 +28,18 @@ import Animated, {
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
 import { Snackbar, Text } from 'react-native-paper';
-import { Copy, Download, MoreVertical, Share2, X } from 'lucide-react-native';
+import {
+  Copy,
+  ImageIcon,
+  Download,
+  MoreVertical,
+  Share2,
+  SquareArrowOutUpRight,
+  X,
+} from 'lucide-react-native';
 
 import { LucideIcon } from './LucideIcon';
+import { copyImageToClipboard } from '../native/imageClipboard';
 
 type MediaItem = {
   path: string;
@@ -278,9 +287,11 @@ type HeaderProps = {
   onClose: () => void;
   onOpenMenu: () => void;
   menuVisible: boolean;
+  onCopyImage: () => void;
+  onOpenWith: () => void;
   onShare: () => void;
   onDownload: () => void;
-  onCopy: () => void;
+  onCopyLink: () => void;
 };
 
 function ViewerHeader({
@@ -289,9 +300,11 @@ function ViewerHeader({
   onClose,
   onOpenMenu,
   menuVisible,
+  onCopyImage,
+  onOpenWith,
   onShare,
   onDownload,
-  onCopy,
+  onCopyLink,
 }: HeaderProps) {
   return (
     <View style={styles.header}>
@@ -312,6 +325,18 @@ function ViewerHeader({
         </Pressable>
         {menuVisible ? (
           <View style={styles.dropdownMenu}>
+            <Pressable onPress={onCopyImage} style={styles.dropdownItem}>
+              <LucideIcon icon={ImageIcon} color="#fff" size={16} />
+              <Text style={styles.dropdownText}>Copy Image</Text>
+            </Pressable>
+            <Pressable onPress={onCopyLink} style={styles.dropdownItem}>
+              <LucideIcon icon={Copy} color="#fff" size={16} />
+              <Text style={styles.dropdownText}>Copy Link</Text>
+            </Pressable>
+            <Pressable onPress={onOpenWith} style={styles.dropdownItem}>
+              <LucideIcon icon={SquareArrowOutUpRight} color="#fff" size={16} />
+              <Text style={styles.dropdownText}>Open With</Text>
+            </Pressable>
             <Pressable onPress={onShare} style={styles.dropdownItem}>
               <LucideIcon icon={Share2} color="#fff" size={16} />
               <Text style={styles.dropdownText}>Share</Text>
@@ -319,10 +344,6 @@ function ViewerHeader({
             <Pressable onPress={onDownload} style={styles.dropdownItem}>
               <LucideIcon icon={Download} color="#fff" size={16} />
               <Text style={styles.dropdownText}>Download</Text>
-            </Pressable>
-            <Pressable onPress={onCopy} style={styles.dropdownItem}>
-              <LucideIcon icon={Copy} color="#fff" size={16} />
-              <Text style={styles.dropdownText}>Copy</Text>
             </Pressable>
           </View>
         ) : null}
@@ -335,7 +356,7 @@ function sanitizeFileName(name: string) {
   return name.replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '_');
 }
 
-function truncateFileName(name: string, maxLength = 20) {
+function truncateFileName(name: string, maxLength = 15) {
   if (name.length <= maxLength) {
     return name;
   }
@@ -373,6 +394,8 @@ export function MediaViewerModal({
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [sharingItem, setSharingItem] = useState(false);
   const [downloadingItem, setDownloadingItem] = useState(false);
+  const [openingExternally, setOpeningExternally] = useState(false);
+  const [copyingImage, setCopyingImage] = useState(false);
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<MediaItem>>(null);
 
@@ -402,14 +425,80 @@ export function MediaViewerModal({
 
   const currentMedia = media[currentIndex];
 
-  const handleCopy = () => {
+  const handleCopyLink = () => {
     if (!currentMedia) {
       return;
     }
 
     Clipboard.setString(currentMedia.path);
     setMenuVisible(false);
-    setSnackbarMessage(`${currentMedia.name} copied`);
+    setSnackbarMessage(`${currentMedia.name} link copied`);
+  };
+
+  const handleCopyImage = async () => {
+    if (!currentMedia) {
+      return;
+    }
+
+    setMenuVisible(false);
+    setCopyingImage(true);
+
+    const sanitizedName = sanitizeFileName(currentMedia.name || 'file');
+    const tempPath = `${
+      ReactNativeBlobUtil.fs.dirs.CacheDir
+    }/${Date.now()}_${sanitizedName}`;
+
+    try {
+      const response = await ReactNativeBlobUtil.config({
+        path: tempPath,
+        fileCache: true,
+      }).fetch('GET', currentMedia.path);
+
+      await copyImageToClipboard(response.path());
+      setSnackbarMessage(`${currentMedia.name} image copied`);
+    } catch {
+      Alert.alert('Copy Error', 'Could not copy this image.');
+    } finally {
+      setCopyingImage(false);
+    }
+  };
+
+  const handleOpenWith = async () => {
+    if (!currentMedia) {
+      return;
+    }
+
+    setMenuVisible(false);
+    setOpeningExternally(true);
+
+    const tempPath = `${
+      ReactNativeBlobUtil.fs.dirs.CacheDir
+    }/${sanitizeFileName(currentMedia.name || 'file')}`;
+
+    try {
+      const response = await ReactNativeBlobUtil.config({
+        path: tempPath,
+        fileCache: true,
+      }).fetch('GET', currentMedia.path);
+
+      const localPath = response.path();
+
+      if (Platform.OS === 'android') {
+        await ReactNativeBlobUtil.android.actionViewIntent(
+          localPath,
+          getMimeType(currentMedia.name),
+        );
+      } else {
+        await ReactNativeBlobUtil.ios.openDocument(localPath);
+      }
+    } catch {
+      Alert.alert(
+        'Open Error',
+        'Could not open this file with any supported application.',
+      );
+    } finally {
+      setOpeningExternally(false);
+    }
   };
 
   const handleShare = async () => {
@@ -544,7 +633,7 @@ export function MediaViewerModal({
             onPress={() => setMenuVisible(false)}
           />
         ) : null}
-        {sharingItem || downloadingItem ? (
+        {sharingItem || downloadingItem || openingExternally || copyingImage ? (
           <View style={styles.actionOverlay}>
             <ActivityIndicator size="large" color="#fff" />
           </View>
@@ -576,9 +665,11 @@ export function MediaViewerModal({
           onClose={onClose}
           onOpenMenu={() => setMenuVisible(true)}
           menuVisible={menuVisible}
+          onCopyImage={handleCopyImage}
+          onOpenWith={handleOpenWith}
           onShare={handleShare}
           onDownload={handleDownload}
-          onCopy={handleCopy}
+          onCopyLink={handleCopyLink}
         />
         <Pressable onPress={handleShare} style={styles.shareShortcut}>
           <LucideIcon icon={Share2} color="#fff" size={20} />
@@ -678,12 +769,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 6,
     elevation: 6,
+    paddingVertical: 10,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
     paddingVertical: 12,
   },
   dropdownText: {
