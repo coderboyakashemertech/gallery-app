@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Clipboard,
   FlatList,
   Image,
@@ -10,7 +9,6 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
-  ToastAndroid,
   useWindowDimensions,
   View,
   type ListRenderItemInfo,
@@ -28,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
-import { Snackbar, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Copy,
@@ -43,6 +41,7 @@ import {
 
 import { LucideIcon } from './LucideIcon';
 import { copyImageToClipboard } from '../native/imageClipboard';
+import { showToast } from '../utils/toast';
 
 type MediaItem = {
   path: string;
@@ -423,7 +422,6 @@ export function MediaViewerModal({
   const [isZoomed, setIsZoomed] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
   const [sharingItem, setSharingItem] = useState(false);
   const [downloadingItem, setDownloadingItem] = useState(false);
   const [openingExternally, setOpeningExternally] = useState(false);
@@ -490,16 +488,11 @@ export function MediaViewerModal({
 
     Clipboard.setString(currentMedia.path);
     setMenuVisible(false);
-    setSnackbarMessage(`${currentMedia.name} link copied`);
+    showToast(`${currentMedia.name} link copied`);
   };
 
   const handleAddToFavorite = () => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show('Added to favourite', ToastAndroid.SHORT);
-      return;
-    }
-
-    setSnackbarMessage('Added to favourite');
+    showToast('Added to favourite');
   };
 
   const handleCopyImage = async () => {
@@ -522,9 +515,9 @@ export function MediaViewerModal({
       }).fetch('GET', currentMedia.path);
 
       await copyImageToClipboard(response.path());
-      setSnackbarMessage(`${currentMedia.name} image copied`);
+      showToast(`${currentMedia.name} image copied`);
     } catch {
-      Alert.alert('Copy Error', 'Could not copy this image.');
+      showToast('Could not copy this image.');
     } finally {
       setCopyingImage(false);
     }
@@ -559,10 +552,7 @@ export function MediaViewerModal({
         await ReactNativeBlobUtil.ios.openDocument(localPath);
       }
     } catch {
-      Alert.alert(
-        'Open Error',
-        'Could not open this file with any supported application.',
-      );
+      showToast('Could not open this file with any supported application.');
     } finally {
       setOpeningExternally(false);
     }
@@ -601,7 +591,7 @@ export function MediaViewerModal({
       }, 5000);
     } catch (error: any) {
       if (error?.message !== 'User did not share') {
-        Alert.alert('Share Error', 'Could not share this image.');
+        showToast('Could not share this image.');
       }
     } finally {
       setSharingItem(false);
@@ -643,14 +633,13 @@ export function MediaViewerModal({
         currentMedia.path,
       );
 
-      Alert.alert(
-        'Download complete',
+      showToast(
         Platform.OS === 'android'
           ? `${currentMedia.name} was saved to Downloads.`
           : `${currentMedia.name} was saved to Documents.`,
       );
     } catch {
-      Alert.alert('Download Error', 'Could not download this image.');
+      showToast('Could not download this image.');
     } finally {
       setDownloadingItem(false);
     }
@@ -753,13 +742,6 @@ export function MediaViewerModal({
             </Pressable>
           </>
         ) : null}
-        <Snackbar
-          visible={Boolean(snackbarMessage)}
-          onDismiss={() => setSnackbarMessage('')}
-          duration={1800}
-        >
-          {snackbarMessage}
-        </Snackbar>
       </GestureHandlerRootView>
     </Modal>
   );

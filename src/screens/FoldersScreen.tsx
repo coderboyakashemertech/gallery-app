@@ -42,7 +42,6 @@ import {
   IconButton,
   Modal,
   Portal,
-  Snackbar,
   Text,
   useTheme,
 } from 'react-native-paper';
@@ -63,6 +62,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../store';
 import { setFolderViewMode, togglePinFolder } from '../store/preferencesSlice';
 import { DirectoryFile, DirectoryFolder } from '../types/folders';
+import { showToast } from '../utils/toast';
 
 type ContextMenuItem = DirectoryFolder | DirectoryFile;
 type DirectoryEntry = (DirectoryFolder | DirectoryFile) & { id: string };
@@ -500,7 +500,6 @@ export function FoldersScreen() {
   const [movingToRecycleBin, setMovingToRecycleBin] = React.useState(false);
   const [contextMenuItem, setContextMenuItem] =
     React.useState<ContextMenuItem | null>(null);
-  const [snackbarMessage, setSnackbarMessage] = React.useState('');
 
   const [moveItemToRecycleBin] = useMoveItemToRecycleBinMutation();
 
@@ -579,10 +578,7 @@ export function FoldersScreen() {
       }
     } catch (error) {
       console.error('Error opening file:', error);
-      Alert.alert(
-        'Error',
-        'Could not open this file with any supported application.',
-      );
+      showToast('Could not open this file with any supported application.');
     } finally {
       setPreparingFile(false);
     }
@@ -630,7 +626,7 @@ export function FoldersScreen() {
         ? contextMenuItem.url
         : decodeURIComponent(contextMenuItem.path),
     );
-    setSnackbarMessage(`${contextMenuItem.name} copied`);
+    showToast(`${contextMenuItem.name} copied`);
     closeContextMenu();
   };
 
@@ -679,10 +675,7 @@ export function FoldersScreen() {
       });
     } catch (error: any) {
       if (error?.message !== 'User did not share') {
-        Alert.alert(
-          'Share Error',
-          'Could not open the share menu for this item.',
-        );
+        showToast('Could not open the share menu for this item.');
       }
     } finally {
       if (isFileItem(target)) {
@@ -695,7 +688,7 @@ export function FoldersScreen() {
     if (!contextMenuItem) return;
 
     if (!isFileItem(contextMenuItem)) {
-      Alert.alert('Folder Download', 'Folder downloads are not available yet.');
+      showToast('Folder downloads are not available yet.');
       closeContextMenu();
       return;
     }
@@ -733,15 +726,14 @@ export function FoldersScreen() {
         file.url,
       );
 
-      Alert.alert(
-        'Download complete',
+      showToast(
         Platform.OS === 'android'
           ? `${file.name} was saved to Downloads.`
           : `${file.name} was saved to Documents.`,
       );
     } catch (error) {
       console.error('Download error:', error);
-      Alert.alert('Download Error', 'Could not download this file.');
+      showToast('Could not download this file.');
     } finally {
       setDownloadingItem(false);
     }
@@ -770,14 +762,14 @@ export function FoldersScreen() {
                 path: target.path,
                 currentPath: path,
               }).unwrap();
-              setSnackbarMessage(`${target.name} moved to recycle bin`);
+              showToast(`${target.name} moved to recycle bin`);
               refetch();
             } catch (error: any) {
               console.error('Recycle bin error:', error);
               const message =
                 error?.data?.message ||
                 `Could not move this ${itemLabel} to the recycle bin.`;
-              Alert.alert('Recycle Bin Error', message);
+              showToast(message);
             } finally {
               setMovingToRecycleBin(false);
             }
@@ -1228,13 +1220,6 @@ export function FoldersScreen() {
         </Modal>
       </Portal>
 
-      <Snackbar
-        visible={Boolean(snackbarMessage)}
-        onDismiss={() => setSnackbarMessage('')}
-        duration={1800}
-      >
-        {snackbarMessage}
-      </Snackbar>
     </Screen>
   );
 }
