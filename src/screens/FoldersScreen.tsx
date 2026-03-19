@@ -31,8 +31,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  type NativeSyntheticEvent,
   useWindowDimensions,
   View,
+  type ImageErrorEventData,
 } from 'react-native';
 import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -87,9 +89,30 @@ const VIDEO_EXTENSIONS = [
   '.webm',
 ];
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac'];
+const IMAGE_DEBUG_PREFIX = '[FoldersScreen:image]';
 
 const isFileItem = (item: ContextMenuItem): item is DirectoryFile =>
   item.type === 'file';
+
+const logImagePreviewError = (
+  item: DirectoryFile,
+  event: NativeSyntheticEvent<ImageErrorEventData>,
+  surface: 'grid' | 'list',
+) => {
+  const nativeEvent = event.nativeEvent;
+
+  console.error(`${IMAGE_DEBUG_PREFIX} preview failed`, {
+    surface,
+    name: item.name,
+    path: item.path,
+    url: item.url,
+    extension: item.extension,
+    size: item.size,
+    platform: Platform.OS,
+    error: nativeEvent.error,
+    nativeEvent,
+  });
+};
 
 const formatSize = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -271,7 +294,13 @@ const FileGridItem = React.memo(
                 source={{ uri: item.url }}
                 style={styles.filePreview}
                 resizeMode="cover"
-                onError={() => setPreviewFailed(true)}
+                resizeMethod="resize"
+                progressiveRenderingEnabled={true}
+                fadeDuration={0}
+                onError={err => {
+                  logImagePreviewError(item, err, 'grid');
+                  setPreviewFailed(true);
+                }}
               />
             ) : (
               <LucideIcon
@@ -407,7 +436,13 @@ const FileListItem = React.memo(
               source={{ uri: item.url }}
               style={styles.rowFilePreview}
               resizeMode="cover"
-              onError={() => setPreviewFailed(true)}
+              resizeMethod="resize"
+              progressiveRenderingEnabled={true}
+              fadeDuration={0}
+              onError={err => {
+                logImagePreviewError(item, err, 'list');
+                setPreviewFailed(true);
+              }}
             />
           ) : (
             <LucideIcon icon={fileInfo.icon} size={22} color={fileInfo.color} />
@@ -450,7 +485,9 @@ export function FoldersScreen() {
   );
 
   const [viewerVisible, setViewerVisible] = React.useState(false);
-  const [mediaList, setMediaList] = React.useState<{ path: string; name: string }[]>([]);
+  const [mediaList, setMediaList] = React.useState<
+    { path: string; name: string }[]
+  >([]);
   const [selectedMediaIndex, setSelectedMediaIndex] = React.useState(0);
   const [videoViewerVisible, setVideoViewerVisible] = React.useState(false);
   const [selectedVideo, setSelectedVideo] = React.useState<{
@@ -925,6 +962,10 @@ export function FoldersScreen() {
           ]}
           columnWrapperStyle={isGridView ? styles.columnWrapper : undefined}
           removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={12}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          updateCellsBatchingPeriod={60}
           ListEmptyComponent={
             !isLoading ? (
               <View style={styles.centerContent}>
@@ -1259,7 +1300,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   filterChip: {
-    borderRadius: 16,
+    borderRadius: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -1322,7 +1363,7 @@ const styles = StyleSheet.create({
   fileGlyph: {
     width: 88,
     height: 70,
-    borderRadius: 16,
+    borderRadius: 5,
     marginBottom: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1330,7 +1371,7 @@ const styles = StyleSheet.create({
   filePreview: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 5,
   },
   gridTileTitle: {
     textAlign: 'center',
@@ -1356,7 +1397,7 @@ const styles = StyleSheet.create({
   rowFileGlyph: {
     width: 52,
     height: 52,
-    borderRadius: 16,
+    borderRadius: 5,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1437,7 +1478,7 @@ const styles = StyleSheet.create({
   contextIconWrap: {
     width: 46,
     height: 46,
-    borderRadius: 16,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },

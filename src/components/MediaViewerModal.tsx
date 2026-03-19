@@ -10,6 +10,7 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
+  ToastAndroid,
   useWindowDimensions,
   View,
   type ListRenderItemInfo,
@@ -28,12 +29,14 @@ import Animated, {
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
 import { Snackbar, Text } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Copy,
   ImageIcon,
   Download,
   MoreVertical,
   Share2,
+  Star,
   SquareArrowOutUpRight,
   X,
 } from 'lucide-react-native';
@@ -60,6 +63,7 @@ type ZoomableImageProps = {
   isActive: boolean;
   isZoomed: boolean;
   onZoomChange: (isZoomed: boolean) => void;
+  onSingleTap: () => void;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -101,6 +105,7 @@ function ZoomableImage({
   isActive,
   isZoomed,
   onZoomChange,
+  onSingleTap,
 }: ZoomableImageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const scale = useSharedValue(1);
@@ -238,6 +243,13 @@ function ZoomableImage({
       runOnJS(notifyZoomChange)(true);
     });
 
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .maxDuration(220)
+    .onEnd(() => {
+      runOnJS(onSingleTap)();
+    });
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
@@ -246,10 +258,12 @@ function ZoomableImage({
     ],
   }));
 
+  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+
   const composedGesture = Gesture.Simultaneous(
     pinchGesture,
     panGesture,
-    doubleTapGesture,
+    tapGesture,
   );
 
   return (
@@ -285,6 +299,7 @@ type HeaderProps = {
   imageIndex: number;
   media: MediaItem[];
   onClose: () => void;
+  onAddToFavorite: () => void;
   onOpenMenu: () => void;
   menuVisible: boolean;
   onCopyImage: () => void;
@@ -292,12 +307,14 @@ type HeaderProps = {
   onShare: () => void;
   onDownload: () => void;
   onCopyLink: () => void;
+  topInset: number;
 };
 
 function ViewerHeader({
   imageIndex,
   media,
   onClose,
+  onAddToFavorite,
   onOpenMenu,
   menuVisible,
   onCopyImage,
@@ -305,9 +322,10 @@ function ViewerHeader({
   onShare,
   onDownload,
   onCopyLink,
+  topInset,
 }: HeaderProps) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: topInset, height: topInset + 56 }]}>
       <Pressable onPress={onClose} style={styles.backButton}>
         <LucideIcon icon={X} color="#fff" size={24} />
       </Pressable>
@@ -320,9 +338,22 @@ function ViewerHeader({
         </Text>
       </View>
       <View style={styles.menuWrap}>
-        <Pressable onPress={onOpenMenu} style={styles.menuButton} hitSlop={10}>
-          <LucideIcon icon={MoreVertical} color="#fff" size={22} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={onAddToFavorite}
+            style={styles.menuButton}
+            hitSlop={10}
+          >
+            <LucideIcon icon={Star} color="#fff" size={20} />
+          </Pressable>
+          <Pressable
+            onPress={onOpenMenu}
+            style={styles.menuButton}
+            hitSlop={10}
+          >
+            <LucideIcon icon={MoreVertical} color="#fff" size={22} />
+          </Pressable>
+        </View>
         {menuVisible ? (
           <View style={styles.dropdownMenu}>
             <Pressable onPress={onCopyImage} style={styles.dropdownItem}>
@@ -391,18 +422,22 @@ export function MediaViewerModal({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isZoomed, setIsZoomed] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [sharingItem, setSharingItem] = useState(false);
   const [downloadingItem, setDownloadingItem] = useState(false);
   const [openingExternally, setOpeningExternally] = useState(false);
   const [copyingImage, setCopyingImage] = useState(false);
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<MediaItem>>(null);
 
   useEffect(() => {
     if (visible) {
       setCurrentIndex(initialIndex);
       setIsZoomed(false);
+      setChromeVisible(true);
+      setMenuVisible(false);
     }
   }, [visible, initialIndex]);
 
@@ -419,11 +454,34 @@ export function MediaViewerModal({
     });
   }, [initialIndex, visible]);
 
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({
+        offset: currentIndex * width,
+        animated: false,
+      });
+    });
+  }, [currentIndex, visible, width, height]);
+
+  const handleToggleChrome = useCallback(() => {
+    setChromeVisible(previousValue => !previousValue);
+    setMenuVisible(false);
+  }, []);
+
   if (!visible || !media.length) {
     return null;
   }
 
   const currentMedia = media[currentIndex];
+  const topInset =
+    Platform.OS === 'android'
+      ? Math.max(insets.top, 8)
+      : Math.max(insets.top, 12);
+  const bottomInset = Math.max(insets.bottom, 16);
 
   const handleCopyLink = () => {
     if (!currentMedia) {
@@ -433,6 +491,15 @@ export function MediaViewerModal({
     Clipboard.setString(currentMedia.path);
     setMenuVisible(false);
     setSnackbarMessage(`${currentMedia.name} link copied`);
+  };
+
+  const handleAddToFavorite = () => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('Added to favourite', ToastAndroid.SHORT);
+      return;
+    }
+
+    setSnackbarMessage('Added to favourite');
   };
 
   const handleCopyImage = async () => {
@@ -597,6 +664,7 @@ export function MediaViewerModal({
       isActive={index === currentIndex}
       isZoomed={index === currentIndex && isZoomed}
       onZoomChange={setIsZoomed}
+      onSingleTap={handleToggleChrome}
     />
   );
 
@@ -625,6 +693,7 @@ export function MediaViewerModal({
         barStyle="light-content"
         backgroundColor="#000"
         translucent={true}
+        hidden={true}
       />
       <GestureHandlerRootView style={styles.container}>
         {menuVisible ? (
@@ -639,13 +708,14 @@ export function MediaViewerModal({
           </View>
         ) : null}
         <FlatList
+          key={`${width}-${height}`}
           ref={listRef}
           data={media}
           renderItem={renderItem}
           keyExtractor={item => item.path}
           horizontal={true}
           pagingEnabled={true}
-          initialScrollIndex={initialIndex}
+          initialScrollIndex={currentIndex}
           scrollEnabled={!isZoomed}
           showsHorizontalScrollIndicator={false}
           style={styles.gallery}
@@ -659,21 +729,30 @@ export function MediaViewerModal({
           }}
         />
 
-        <ViewerHeader
-          imageIndex={currentIndex}
-          media={media}
-          onClose={onClose}
-          onOpenMenu={() => setMenuVisible(true)}
-          menuVisible={menuVisible}
-          onCopyImage={handleCopyImage}
-          onOpenWith={handleOpenWith}
-          onShare={handleShare}
-          onDownload={handleDownload}
-          onCopyLink={handleCopyLink}
-        />
-        <Pressable onPress={handleShare} style={styles.shareShortcut}>
-          <LucideIcon icon={Share2} color="#fff" size={20} />
-        </Pressable>
+        {chromeVisible ? (
+          <>
+            <ViewerHeader
+              imageIndex={currentIndex}
+              media={media}
+              onClose={onClose}
+              onAddToFavorite={handleAddToFavorite}
+              onOpenMenu={() => setMenuVisible(true)}
+              menuVisible={menuVisible}
+              onCopyImage={handleCopyImage}
+              onOpenWith={handleOpenWith}
+              onShare={handleShare}
+              onDownload={handleDownload}
+              onCopyLink={handleCopyLink}
+              topInset={topInset}
+            />
+            <Pressable
+              onPress={handleShare}
+              style={[styles.shareShortcut, { bottom: bottomInset }]}
+            >
+              <LucideIcon icon={Share2} color="#fff" size={20} />
+            </Pressable>
+          </>
+        ) : null}
         <Snackbar
           visible={Boolean(snackbarMessage)}
           onDismiss={() => setSnackbarMessage('')}
@@ -717,8 +796,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 5,
     elevation: 5,
-    height: 100,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -733,6 +810,10 @@ const styles = StyleSheet.create({
   },
   menuWrap: {
     position: 'relative',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   titleContainer: {
     flex: 1,
@@ -783,7 +864,6 @@ const styles = StyleSheet.create({
   },
   shareShortcut: {
     position: 'absolute',
-    bottom: 50,
     alignSelf: 'center',
     zIndex: 5,
     elevation: 5,
