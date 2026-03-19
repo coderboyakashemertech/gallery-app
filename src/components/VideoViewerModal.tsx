@@ -18,10 +18,12 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  Volume2,
   X,
 } from 'lucide-react-native';
 import Video, {
   BufferingStrategyType,
+  SelectedTrackType,
   type VideoRef,
 } from 'react-native-video';
 import { Text } from 'react-native-paper';
@@ -39,8 +41,17 @@ type Props = {
   video: VideoItem | null;
 };
 
+type PlayerAudioTrack = {
+  selected?: boolean;
+  type?: string;
+  title?: string;
+  language?: string;
+  index: number;
+};
+
 const AUTO_HIDE_DELAY_MS = 2500;
 const SEEK_STEP_SECONDS = 10;
+const VIDEO_DEBUG_PREFIX = '[VideoViewerModal]';
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) {
@@ -67,9 +78,17 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showAudioSelector, setShowAudioSelector] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [progressBarWidth, setProgressBarWidth] = useState(0);
+  const [audioTracks, setAudioTracks] = useState<PlayerAudioTrack[]>([]);
+  const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState<
+    number | null
+  >(null);
+  const [appliedAudioTrackIndex, setAppliedAudioTrackIndex] = useState<
+    number | null
+  >(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<VideoRef>(null);
   const { width, height } = useWindowDimensions();
@@ -92,6 +111,28 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
       }, AUTO_HIDE_DELAY_MS);
+    }
+  };
+
+  const syncAudioTracks = (tracks: PlayerAudioTrack[]) => {
+    setAudioTracks(tracks);
+
+    const selectedTrack = tracks.find(track => track.selected);
+
+    if (selectedTrack) {
+      setSelectedAudioTrackIndex(selectedTrack.index);
+      setAppliedAudioTrackIndex(selectedTrack.index);
+      return;
+    }
+
+    if (tracks.length > 0 && selectedAudioTrackIndex === null) {
+      logVideoDebug('autoSelectedAudioTrack', {
+        index: tracks[0].index,
+        title: tracks[0].title,
+        language: tracks[0].language,
+        type: tracks[0].type,
+      });
+      setSelectedAudioTrackIndex(tracks[0].index);
     }
   };
 
@@ -133,8 +174,12 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
       setIsLoading(true);
       setIsPaused(false);
       setShowControls(true);
+      setShowAudioSelector(false);
       setDuration(0);
       setCurrentTime(0);
+      setAudioTracks([]);
+      setSelectedAudioTrackIndex(null);
+      setAppliedAudioTrackIndex(null);
       clearControlsTimeout();
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
@@ -196,6 +241,25 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
 
   const progressRatio = duration > 0 ? currentTime / duration : 0;
   const remainingTime = Math.max(duration - currentTime, 0);
+  const selectedAudioTrack =
+    appliedAudioTrackIndex === null
+      ? undefined
+      : {
+          type: SelectedTrackType.INDEX,
+          value: appliedAudioTrackIndex,
+        };
+
+  const logVideoDebug = (eventName: string, payload?: unknown) => {
+    if (!video) {
+      return;
+    }
+
+    console.log(`${VIDEO_DEBUG_PREFIX} ${eventName}`, {
+      fileName: video.name,
+      path: video.path,
+      ...(payload && typeof payload === 'object' ? (payload as object) : {}),
+    });
+  };
 
   return (
     <Modal
@@ -236,14 +300,25 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
             controls={false}
             paused={isPaused}
             resizeMode="contain"
+            selectedAudioTrack={selectedAudioTrack}
             onLoad={event => {
               setDuration(event.duration);
               setCurrentTime(event.currentTime);
               setIsLoading(false);
+              syncAudioTracks(event.audioTracks);
+              logVideoDebug('onLoad', {
+                duration: event.duration,
+                currentTime: event.currentTime,
+                naturalSize: event.naturalSize,
+                audioTracks: event.audioTracks,
+                textTracks: event.textTracks,
+                videoTracks: event.videoTracks,
+              });
               revealControls();
             }}
             onLoadStart={() => {
               setIsLoading(true);
+              logVideoDebug('onLoadStart');
             }}
             onProgress={event => {
               setCurrentTime(event.currentTime);
@@ -252,28 +327,36 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
               setIsPaused(true);
               setShowControls(true);
               setCurrentTime(duration);
+              logVideoDebug('onEnd');
             }}
-            onError={() => {
+            onError={error => {
               setIsLoading(false);
               setShowControls(true);
+              logVideoDebug('onError', error);
             }}
             onBuffer={({ isBuffering }) => {
               setIsLoading(isBuffering);
+              logVideoDebug('onBuffer', { isBuffering });
+            }}
+            onAudioTracks={event => {
+              syncAudioTracks(event.audioTracks);
+              logVideoDebug('onAudioTracks', { audioTracks: event.audioTracks });
             }}
           />
 
-          <Pressable
-            style={styles.overlayTouchArea}
-            onPress={() => {
-              if (showControls) {
-                setShowControls(false);
-                clearControlsTimeout();
-                return;
-              }
+          <View style={styles.overlayTouchArea} pointerEvents="box-none">
+            <Pressable
+              style={styles.overlayBackgroundTap}
+              onPress={() => {
+                if (showControls) {
+                  setShowControls(false);
+                  clearControlsTimeout();
+                  return;
+                }
 
-              revealControls();
-            }}
-          >
+                revealControls();
+              }}
+            />
             {showControls ? (
               <>
                 <View
@@ -288,13 +371,29 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
                     <LucideIcon icon={X} color="#fff" size={22} />
                   </Pressable>
 
-                  <Pressable
-                    onPress={() => videoRef.current?.presentFullscreenPlayer()}
-                    style={styles.iconButton}
-                    hitSlop={10}
-                  >
-                    <LucideIcon icon={Expand} color="#fff" size={20} />
-                  </Pressable>
+                  <View style={styles.topActions}>
+                    {audioTracks.length > 0 ? (
+                      <Pressable
+                        onPress={() => {
+                          setShowAudioSelector(previousValue => !previousValue);
+                          revealControls();
+                        }}
+                        style={styles.audioButton}
+                        hitSlop={10}
+                      >
+                        <LucideIcon icon={Volume2} color="#fff" size={18} />
+                        <Text style={styles.audioButtonLabel}>Audio</Text>
+                      </Pressable>
+                    ) : null}
+
+                    <Pressable
+                      onPress={() => videoRef.current?.presentFullscreenPlayer()}
+                      style={styles.iconButton}
+                      hitSlop={10}
+                    >
+                      <LucideIcon icon={Expand} color="#fff" size={20} />
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={styles.centerControls} pointerEvents="box-none">
@@ -339,6 +438,65 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
                     { bottom: playerBottomInset + 10 },
                   ]}
                 >
+                  {showAudioSelector && audioTracks.length > 0 ? (
+                    <View style={styles.audioSelector}>
+                      <Text style={styles.audioSelectorTitle}>Audio Tracks</Text>
+                      <View style={styles.audioTrackList}>
+                        {audioTracks.map(track => {
+                          const isSelected =
+                            selectedAudioTrackIndex === track.index;
+                          const label =
+                            track.title?.trim() ||
+                            track.language?.toUpperCase() ||
+                            `Track ${track.index + 1}`;
+
+                          return (
+                            <Pressable
+                              key={`${track.index}-${track.language ?? 'unknown'}`}
+                              onPress={() => {
+                                setSelectedAudioTrackIndex(track.index);
+                                setAppliedAudioTrackIndex(track.index);
+                                setShowAudioSelector(false);
+                                revealControls();
+                                logVideoDebug('selectedAudioTrack', {
+                                  index: track.index,
+                                  title: track.title,
+                                  language: track.language,
+                                  type: track.type,
+                                });
+                              }}
+                              style={[
+                                styles.audioTrackChip,
+                                isSelected && styles.audioTrackChipActive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.audioTrackLabel,
+                                  isSelected && styles.audioTrackLabelActive,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {label}
+                              </Text>
+                              {track.type ? (
+                                <Text
+                                  style={[
+                                    styles.audioTrackMeta,
+                                    isSelected && styles.audioTrackMetaActive,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {track.type}
+                                </Text>
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : null}
+
                   <View style={styles.timeRow}>
                     <Text style={styles.timeLabel}>
                       {formatTime(currentTime)}
@@ -380,7 +538,7 @@ export function VideoViewerModal({ visible, onClose, video }: Props) {
                 </View>
               </>
             ) : null}
-          </Pressable>
+          </View>
         </View>
 
         {isLoading ? (
@@ -411,6 +569,9 @@ const styles = StyleSheet.create({
   overlayTouchArea: {
     ...StyleSheet.absoluteFillObject,
   },
+  overlayBackgroundTap: {
+    ...StyleSheet.absoluteFillObject,
+  },
   topControls: {
     position: 'absolute',
     left: 16,
@@ -419,6 +580,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   centerControls: {
     ...StyleSheet.absoluteFillObject,
@@ -441,6 +607,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
+  audioButton: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15,15,15,0.76)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  audioButtonLabel: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   iconButton: {
     width: 44,
     height: 44,
@@ -458,6 +641,51 @@ const styles = StyleSheet.create({
       height: 6,
     },
     elevation: 4,
+  },
+  audioSelector: {
+    marginBottom: 14,
+    gap: 10,
+  },
+  audioSelectorTitle: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  audioTrackList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  audioTrackChip: {
+    maxWidth: '100%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  audioTrackChipActive: {
+    backgroundColor: 'rgba(242,166,90,0.18)',
+    borderColor: 'rgba(242,166,90,0.55)',
+  },
+  audioTrackLabel: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  audioTrackLabelActive: {
+    color: '#fff4e9',
+  },
+  audioTrackMeta: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+  },
+  audioTrackMetaActive: {
+    color: 'rgba(255,244,233,0.82)',
   },
   primaryControl: {
     width: 74,
