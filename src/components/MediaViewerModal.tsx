@@ -41,6 +41,8 @@ import {
 
 import { LucideIcon } from './LucideIcon';
 import { copyImageToClipboard } from '../native/imageClipboard';
+import { getDownloadDestination } from '../utils/downloads';
+import { ensureAndroidStoragePermission } from '../utils/storagePermissions';
 import { showToast } from '../utils/toast';
 
 type MediaItem = {
@@ -607,24 +609,30 @@ export function MediaViewerModal({
     setDownloadingItem(true);
 
     const sanitizedName = sanitizeFileName(currentMedia.name || 'file');
-    const downloadDest =
-      Platform.OS === 'android'
-        ? `${ReactNativeBlobUtil.fs.dirs.DownloadDir}/${sanitizedName}`
-        : `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${sanitizedName}`;
 
     try {
+      const hasStoragePermission = await ensureAndroidStoragePermission();
+
+      if (!hasStoragePermission) {
+        showToast('Storage permission is required to save downloads.');
+        return;
+      }
+
+      const downloadTarget = await getDownloadDestination(sanitizedName);
       const configOptions = Platform.select({
         android: {
           addAndroidDownloads: {
             useDownloadManager: true,
             notification: true,
-            path: downloadDest,
+            mediaScannable: true,
+            path: downloadTarget.filePath,
+            title: currentMedia.name,
             description: `Downloading ${currentMedia.name}`,
             mime: getMimeType(currentMedia.name),
           },
         },
         ios: {
-          path: downloadDest,
+          path: downloadTarget.filePath,
         },
       });
 
@@ -634,9 +642,7 @@ export function MediaViewerModal({
       );
 
       showToast(
-        Platform.OS === 'android'
-          ? `${currentMedia.name} was saved to Downloads.`
-          : `${currentMedia.name} was saved to Documents.`,
+        `${currentMedia.name} was saved to ${downloadTarget.successLabel}.`,
       );
     } catch {
       showToast('Could not download this image.');

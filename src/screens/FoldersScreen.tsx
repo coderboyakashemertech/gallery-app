@@ -62,6 +62,8 @@ import {
 import { useAppDispatch, useAppSelector } from '../store';
 import { setFolderViewMode, togglePinFolder } from '../store/preferencesSlice';
 import { DirectoryFile, DirectoryFolder } from '../types/folders';
+import { getDownloadDestination } from '../utils/downloads';
+import { ensureAndroidStoragePermission } from '../utils/storagePermissions';
 import { showToast } from '../utils/toast';
 
 type ContextMenuItem = DirectoryFolder | DirectoryFile;
@@ -697,27 +699,33 @@ export function FoldersScreen() {
     const ext = file.extension?.toLowerCase() || '';
     const mimeType = getMimeType(ext);
     const sanitizedName = sanitizeFileName(file.name);
-    const downloadDest =
-      Platform.OS === 'android'
-        ? `${ReactNativeBlobUtil.fs.dirs.DownloadDir}/${sanitizedName}`
-        : `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${sanitizedName}`;
 
     closeContextMenu();
     setDownloadingItem(true);
 
     try {
+      const hasStoragePermission = await ensureAndroidStoragePermission();
+
+      if (!hasStoragePermission) {
+        showToast('Storage permission is required to save downloads.');
+        return;
+      }
+
+      const downloadTarget = await getDownloadDestination(sanitizedName);
       const configOptions = Platform.select({
         android: {
           addAndroidDownloads: {
             useDownloadManager: true,
             notification: true,
-            path: downloadDest,
+            mediaScannable: true,
+            path: downloadTarget.filePath,
+            title: file.name,
             description: `Downloading ${file.name}`,
             mime: mimeType,
           },
         },
         ios: {
-          path: downloadDest,
+          path: downloadTarget.filePath,
         },
       });
 
@@ -727,9 +735,7 @@ export function FoldersScreen() {
       );
 
       showToast(
-        Platform.OS === 'android'
-          ? `${file.name} was saved to Downloads.`
-          : `${file.name} was saved to Documents.`,
+        `${file.name} was saved to ${downloadTarget.successLabel}.`,
       );
     } catch (error) {
       console.error('Download error:', error);

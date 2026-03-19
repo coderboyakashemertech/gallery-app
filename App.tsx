@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -12,6 +12,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { store, persistor, useAppSelector } from './src/store';
 import { getNavigationTheme, getPaperTheme } from './src/theme';
+import { ensureAndroidStoragePermission } from './src/utils/storagePermissions';
 
 const rootStyle = { flex: 1 } as const;
 
@@ -32,6 +33,12 @@ function AppProviders() {
   const isAuthenticated = useAppSelector(state => Boolean(state.auth.token));
   const paperTheme = getPaperTheme(isDarkMode);
   const navigationTheme = getNavigationTheme(isDarkMode);
+
+  useEffect(() => {
+    ensureAndroidStoragePermission().catch(error => {
+      console.warn('Storage permission request failed:', error);
+    });
+  }, []);
 
   return (
     <SafeAreaProvider>
