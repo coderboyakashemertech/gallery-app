@@ -1,4 +1,4 @@
-import { FolderOpen, HardDrive, Pin, RefreshCcw } from 'lucide-react-native';
+import { Folder, HardDrive, Pin, RefreshCcw } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Card, IconButton, Surface, Text, useTheme } from 'react-native-paper';
@@ -97,7 +97,7 @@ const PinnedFolderCard = React.memo(
             ]}
           >
             <LucideIcon
-              icon={FolderOpen}
+              icon={Folder}
               color={theme.colors.primary}
               size={22}
             />

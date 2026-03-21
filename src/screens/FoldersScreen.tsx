@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  EllipsisVertical,
   Copy,
   Download,
   File as FileIcon,
@@ -14,8 +15,8 @@ import {
   FileCode,
   FileQuestion,
   FileText,
+  Folder,
   Pin,
-  RefreshCcw,
   Share2,
   Trash2,
   X,
@@ -30,6 +31,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   type NativeSyntheticEvent,
   useWindowDimensions,
@@ -37,14 +39,9 @@ import {
   type ImageErrorEventData,
 } from 'react-native';
 import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import {
-  IconButton,
-  Modal,
-  Portal,
-  Text,
-  useTheme,
-} from 'react-native-paper';
+import { IconButton, Modal, Portal, Text, useTheme } from 'react-native-paper';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -56,6 +53,7 @@ import { VideoViewerModal } from '../components/VideoViewerModal';
 import { Screen } from '../components/Screen';
 import { FoldersStackParamList } from '../navigation/DrawerNavigator';
 import {
+  useGetFavoriteImagesQuery,
   useListDirectoryQuery,
   useMoveItemToRecycleBinMutation,
 } from '../store/authApi';
@@ -336,11 +334,13 @@ const FolderListItem = React.memo(
     item,
     onPress,
     onLongPress,
+    onMenuPress,
     isGridView = false,
   }: {
     item: DirectoryFolder;
     onPress: () => void;
     onLongPress: () => void;
+    onMenuPress: () => void;
     isGridView?: boolean;
   }) => {
     const theme = useTheme();
@@ -355,37 +355,127 @@ const FolderListItem = React.memo(
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
-        style={({ pressed }) => [
-          styles.rowItem,
-          {
-            backgroundColor: theme.dark
-              ? 'rgba(255,255,255,0.04)'
-              : theme.colors.surface,
-          },
-          pressed && { opacity: 0.88 },
-        ]}
+        style={({ pressed }) => [styles.rowItem, pressed && { opacity: 0.84 }]}
       >
-        <FolderGlyph
-          accent="#f2cb48"
-          size={64}
-          icon={
-            isPinned ? (
-              <LucideIcon icon={Pin} size={14} color="#8a6300" />
-            ) : undefined
-          }
-        />
+        <View
+          style={[
+            styles.rowFolderGlyph,
+            { backgroundColor: theme.colors.surfaceVariant },
+          ]}
+        >
+          <LucideIcon icon={Folder} size={20} color="#d9d7f2" />
+          {isPinned ? (
+            <View style={styles.rowFolderPin}>
+              <LucideIcon icon={Pin} size={10} color={theme.colors.primary} />
+            </View>
+          ) : null}
+        </View>
         <View style={styles.rowBody}>
-          <Text numberOfLines={1} variant="titleMedium" style={styles.rowTitle}>
+          <Text numberOfLines={1} variant="titleLarge" style={styles.rowTitle}>
             {!isGridView ? item.name : truncateLabel(item.name)}
           </Text>
           <Text
-            variant="bodySmall"
+            variant="bodyMedium"
             style={[styles.rowMeta, { color: theme.colors.onSurfaceVariant }]}
           >
             Folder
           </Text>
         </View>
-        <ChevronRight size={24} color={theme.colors.onSurfaceVariant} />
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={onMenuPress}
+          style={styles.rowMenuButton}
+        >
+          <LucideIcon
+            icon={EllipsisVertical}
+            size={22}
+            color={theme.colors.onSurfaceVariant}
+          />
+        </Pressable>
+      </Pressable>
+    );
+  },
+);
+
+const FavoriteGalleryItem = React.memo(
+  ({
+    item,
+    onPress,
+    onLongPress,
+  }: {
+    item: DirectoryFile;
+    onPress: () => void;
+    onLongPress: () => void;
+  }) => {
+    const theme = useTheme();
+    const [previewFailed, setPreviewFailed] = React.useState(false);
+
+    return (
+      <Pressable
+        style={styles.favoriteTilePressable}
+        onPress={onPress}
+        onLongPress={onLongPress}
+      >
+        <View
+          style={[
+            styles.favoriteCard,
+            {
+              backgroundColor: theme.dark
+                ? 'rgba(255,255,255,0.05)'
+                : theme.colors.surface,
+            },
+          ]}
+        >
+          <View style={styles.favoriteImageWrap}>
+            {!previewFailed ? (
+              <Image
+                source={{ uri: item.url }}
+                style={styles.favoriteImage}
+                resizeMode="cover"
+                resizeMethod="resize"
+                progressiveRenderingEnabled={true}
+                fadeDuration={0}
+                onError={err => {
+                  logImagePreviewError(item, err, 'grid');
+                  setPreviewFailed(true);
+                }}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.favoriteFallback,
+                  {
+                    backgroundColor: theme.dark
+                      ? 'rgba(255,255,255,0.04)'
+                      : theme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <LucideIcon icon={ImageIcon} size={32} color="#7c8aa5" />
+              </View>
+            )}
+          </View>
+          <View style={styles.favoriteCardBody}>
+            <Text
+              numberOfLines={1}
+              variant="titleSmall"
+              style={styles.favoriteCardTitle}
+            >
+              {item.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              variant="bodySmall"
+              style={[
+                styles.favoriteCardMeta,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {formatSize(item.size)}
+            </Text>
+          </View>
+        </View>
       </Pressable>
     );
   },
@@ -396,11 +486,13 @@ const FileListItem = React.memo(
     item,
     onPress,
     onLongPress,
+    onMenuPress,
     isGridView = false,
   }: {
     item: DirectoryFile;
     onPress: () => void;
     onLongPress: () => void;
+    onMenuPress: () => void;
     isGridView?: boolean;
   }) => {
     const theme = useTheme();
@@ -413,24 +505,12 @@ const FileListItem = React.memo(
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
-        style={({ pressed }) => [
-          styles.rowItem,
-          {
-            backgroundColor: theme.dark
-              ? 'rgba(255,255,255,0.04)'
-              : theme.colors.surface,
-          },
-          pressed && { opacity: 0.88 },
-        ]}
+        style={({ pressed }) => [styles.rowItem, pressed && { opacity: 0.84 }]}
       >
         <View
           style={[
             styles.rowFileGlyph,
-            {
-              backgroundColor: theme.dark
-                ? 'rgba(255,255,255,0.06)'
-                : theme.colors.surfaceVariant,
-            },
+            { backgroundColor: theme.colors.surfaceVariant },
           ]}
         >
           {shouldShowPreview ? (
@@ -447,15 +527,15 @@ const FileListItem = React.memo(
               }}
             />
           ) : (
-            <LucideIcon icon={fileInfo.icon} size={22} color={fileInfo.color} />
+            <LucideIcon icon={fileInfo.icon} size={24} color={fileInfo.color} />
           )}
         </View>
         <View style={styles.rowBody}>
-          <Text numberOfLines={1} variant="titleMedium" style={styles.rowTitle}>
+          <Text numberOfLines={1} variant="titleLarge" style={styles.rowTitle}>
             {isGridView ? truncateLabel(item.name) : item.name}
           </Text>
           <Text
-            variant="bodySmall"
+            variant="bodyMedium"
             style={[styles.rowMeta, { color: theme.colors.onSurfaceVariant }]}
           >
             {formatSize(item.size)}
@@ -464,7 +544,18 @@ const FileListItem = React.memo(
               : ''}
           </Text>
         </View>
-        <ChevronRight size={18} color={theme.colors.onSurfaceVariant} />
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={onMenuPress}
+          style={styles.rowMenuButton}
+        >
+          <LucideIcon
+            icon={EllipsisVertical}
+            size={22}
+            color={theme.colors.onSurfaceVariant}
+          />
+        </Pressable>
       </Pressable>
     );
   },
@@ -478,12 +569,13 @@ export function FoldersScreen() {
   const route = useRoute<RouteProp<FoldersStackParamList, 'Folders'>>();
   const { width } = useWindowDimensions();
   const breadcrumbScrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const pinnedFolders = useAppSelector(
     state => state.preferences.pinnedFolders || [],
   );
   const folderViewMode = useAppSelector(
-    state => state.preferences.folderViewMode ?? 'grid',
+    state => state.preferences.folderViewMode ?? 'list',
   );
 
   const [viewerVisible, setViewerVisible] = React.useState(false);
@@ -506,17 +598,41 @@ export function FoldersScreen() {
   const [moveItemToRecycleBin] = useMoveItemToRecycleBinMutation();
 
   const path = route.params?.path || '';
-  const folderName = route.params?.name || 'Root';
-  const isGridView = folderViewMode === 'grid';
-  const numColumns = isGridView ? (width >= 900 ? 5 : width >= 700 ? 4 : 3) : 1;
+  const isFavoritesView = route.params?.view === 'favorites';
+  const folderName =
+    route.params?.name || (isFavoritesView ? 'Favourites' : 'Root');
+  const isGridView = isFavoritesView ? true : folderViewMode === 'grid';
+  const numColumns = isFavoritesView
+    ? width >= 1200
+      ? 4
+      : width >= 820
+      ? 3
+      : 2
+    : isGridView
+    ? width >= 900
+      ? 5
+      : width >= 700
+      ? 4
+      : 3
+    : 1;
+
+  const {
+    data: favoriteImagesData,
+    isLoading: isFavoriteImagesLoading,
+    isFetching: isFavoriteImagesFetching,
+    refetch: refetchFavoriteImages,
+    error: favoriteImagesError,
+  } = useGetFavoriteImagesQuery(undefined, {
+    skip: !isFavoritesView,
+  });
 
   const { data, isLoading, refetch, isFetching } = useListDirectoryQuery(
     { path },
-    { skip: !path },
+    { skip: !path || isFavoritesView },
   );
 
   const breadcrumbs = useMemo(() => {
-    if (!path) return [];
+    if (!path || isFavoritesView) return [];
 
     const parts = decodeURIComponent(path).split('/').filter(Boolean);
     let currentPath = '';
@@ -529,13 +645,25 @@ export function FoldersScreen() {
         path: encodeURIComponent(currentPath),
       };
     });
-  }, [path]);
+  }, [isFavoritesView, path]);
 
   useEffect(() => {
     breadcrumbScrollViewRef.current?.scrollToEnd({ animated: true });
   }, [breadcrumbs]);
 
+  const favoriteImages = useMemo(
+    () => favoriteImagesData || [],
+    [favoriteImagesData],
+  );
+
   const combinedData = useMemo<DirectoryEntry[]>(() => {
+    if (isFavoritesView) {
+      return favoriteImages.map(file => ({
+        ...file,
+        id: `favorite-image-${file.path}`,
+      }));
+    }
+
     if (!data) return [];
 
     return [
@@ -545,10 +673,12 @@ export function FoldersScreen() {
       })),
       ...data.files.map(file => ({ ...file, id: `file-${file.path}` })),
     ];
-  }, [data]);
+  }, [data, favoriteImages, isFavoritesView]);
 
-  const folderCount = data?.folders.length ?? 0;
-  const fileCount = data?.files.length ?? 0;
+  const folderCount = isFavoritesView ? 0 : data?.folders.length ?? 0;
+  const fileCount = isFavoritesView
+    ? favoriteImages.length
+    : data?.files.length ?? 0;
 
   const handleFolderPress = (folder: DirectoryFolder) => {
     navigation.push('Folders', { path: folder.path, name: folder.name });
@@ -592,7 +722,10 @@ export function FoldersScreen() {
     const isVideo = VIDEO_EXTENSIONS.includes(ext);
 
     if (isImage) {
-      const media = (data?.files || [])
+      const availableFiles = isFavoritesView
+        ? favoriteImages
+        : data?.files || [];
+      const media = availableFiles
         .filter(current => {
           const currentExt = current.extension?.toLowerCase() || '';
           return VIEWER_IMAGE_EXTENSIONS.includes(currentExt);
@@ -734,9 +867,7 @@ export function FoldersScreen() {
         file.url,
       );
 
-      showToast(
-        `${file.name} was saved to ${downloadTarget.successLabel}.`,
-      );
+      showToast(`${file.name} was saved to ${downloadTarget.successLabel}.`);
     } catch (error) {
       console.error('Download error:', error);
       showToast('Could not download this file.');
@@ -786,6 +917,18 @@ export function FoldersScreen() {
   };
 
   const renderItem: ListRenderItem<DirectoryEntry> = ({ item }) => {
+    if (isFavoritesView && item.type === 'file') {
+      return (
+        <View style={[styles.gridColumn, { width: `${100 / numColumns}%` }]}>
+          <FavoriteGalleryItem
+            item={item}
+            onPress={() => handleFilePress(item)}
+            onLongPress={() => setContextMenuItem(item)}
+          />
+        </View>
+      );
+    }
+
     if (item.type === 'directory') {
       return isGridView ? (
         <View style={[styles.gridColumn, { width: `${100 / numColumns}%` }]}>
@@ -801,6 +944,7 @@ export function FoldersScreen() {
           isGridView={isGridView}
           onPress={() => handleFolderPress(item)}
           onLongPress={() => setContextMenuItem(item)}
+          onMenuPress={() => setContextMenuItem(item)}
         />
       );
     }
@@ -818,415 +962,455 @@ export function FoldersScreen() {
         item={item}
         onPress={() => handleFilePress(item)}
         onLongPress={() => setContextMenuItem(item)}
+        onMenuPress={() => setContextMenuItem(item)}
       />
     );
   };
 
   return (
-    <Screen
-      style={[styles.screen, { backgroundColor: theme.colors.background }]}
-      scrollable={false}
-      noPadding
-    >
-      <View style={styles.topPanel}>
-        <View style={styles.titleRow}>
-          <Pressable
-            onPress={() =>
-              navigation.canGoBack()
-                ? navigation.goBack()
-                : navigation.getParent()?.navigate('Home')
-            }
-            style={styles.backButton}
-          >
-            <LucideIcon
-              icon={ChevronLeft}
-              size={24}
-              color={theme.colors.onSurface}
-            />
-          </Pressable>
-          <View style={styles.titleBlock}>
-            <Text variant="bodySmall" style={styles.titleText}>
-              {folderName}
-            </Text>
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.titleMeta,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              {folderCount} folders {fileCount} files
-            </Text>
-          </View>
-          <IconButton
-            icon={({ size }) => (
-              <LucideIcon
-                icon={isGridView ? List : Grid2x2}
-                size={size}
-                color={theme.colors.onSurface}
-              />
-            )}
-            onPress={() =>
-              dispatch(setFolderViewMode(isGridView ? 'list' : 'grid'))
-            }
-            style={styles.toolbarIconButton}
-          />
-          <IconButton
-            icon={({ size }) => (
-              <LucideIcon
-                icon={RefreshCcw}
-                size={size}
-                color={theme.colors.onSurface}
-              />
-            )}
-            onPress={refetch}
-            disabled={isFetching || !path}
-            style={styles.toolbarIconButton}
-          />
-        </View>
-
-        <ScrollView
-          ref={breadcrumbScrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.breadcrumbsWrap}
+    <>
+      <StatusBar backgroundColor="#232329" barStyle="light-content" />
+      <Screen
+        style={[styles.screen, { backgroundColor: theme.colors.background }]}
+        scrollable={false}
+        noPadding
+        edges={['bottom', 'left', 'right']}
+      >
+        <View
+          style={[
+          styles.topPanel,
+          { paddingTop: insets.top + 8 },
+          isFavoritesView && styles.favoritesTopPanel,
+        ]}
         >
-          <Pressable
-            style={styles.crumbPill}
-            onPress={() => navigation.getParent()?.navigate('Home')}
-          >
-            <LucideIcon
-              icon={HardDrive}
-              size={14}
-              color={theme.colors.onSurface}
-            />
-            <Text variant="labelMedium" style={styles.crumbText}>
-              Drives
-            </Text>
-          </Pressable>
-          {breadcrumbs.map((crumb, index) => (
+          <View style={styles.titleRow}>
             <Pressable
-              key={crumb.path}
-              style={[
-                styles.crumbPill,
-                index === breadcrumbs.length - 1 && styles.crumbPillActive,
-              ]}
               onPress={() =>
-                navigation.push('Folders', {
-                  path: crumb.path,
-                  name: crumb.name,
-                })
+                navigation.canGoBack()
+                  ? navigation.goBack()
+                  : navigation.getParent()?.navigate('Home')
               }
+              style={styles.backButton}
             >
-              <Text variant="labelMedium" style={styles.crumbText}>
-                {crumb.name}
-              </Text>
+              <LucideIcon
+                icon={ChevronLeft}
+                size={24}
+                color={theme.colors.onSurface}
+              />
             </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <LoadingOverlay visible={isLoading || isFetching} message="Browsing..." />
-      <LoadingOverlay visible={preparingFile} message="Preparing file..." />
-      <LoadingOverlay visible={downloadingItem} message="Downloading..." />
-      <LoadingOverlay visible={sharingItem} message="Preparing share..." />
-      <LoadingOverlay
-        visible={movingToRecycleBin}
-        message="Moving to recycle bin..."
-      />
-
-      {!path ? (
-        <View style={styles.centerContent}>
-          <LucideIcon
-            icon={HardDrive}
-            size={48}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text variant="bodyLarge" style={styles.infoText}>
-            Select a drive from the Home screen to start browsing.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          key={`${folderViewMode}-${numColumns}`}
-          data={combinedData}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          numColumns={numColumns}
-          style={styles.list}
-          contentContainerStyle={[
-            styles.listContent,
-            isGridView ? styles.gridContent : styles.listModeContent,
-          ]}
-          columnWrapperStyle={isGridView ? styles.columnWrapper : undefined}
-          removeClippedSubviews={Platform.OS === 'android'}
-          initialNumToRender={12}
-          maxToRenderPerBatch={8}
-          windowSize={7}
-          updateCellsBatchingPeriod={60}
-          ListEmptyComponent={
-            !isLoading ? (
-              <View style={styles.centerContent}>
-                <Text variant="bodyMedium" style={styles.emptyText}>
-                  This folder is empty.
-                </Text>
-              </View>
-            ) : null
-          }
-        />
-      )}
-
-      <MediaViewerModal
-        visible={viewerVisible}
-        onClose={() => setViewerVisible(false)}
-        media={mediaList}
-        initialIndex={selectedMediaIndex}
-      />
-      <VideoViewerModal
-        visible={videoViewerVisible}
-        onClose={() => setVideoViewerVisible(false)}
-        video={selectedVideo}
-      />
-
-      <Portal>
-        <Modal
-          visible={Boolean(contextMenuItem)}
-          onDismiss={closeContextMenu}
-          contentContainerStyle={styles.contextModal}
-        >
-          <View
-            style={[
-              styles.contextSheet,
-              { backgroundColor: theme.colors.elevation.level3 },
-            ]}
-          >
-            <View style={styles.contextHandle} />
-            <View style={styles.contextHeader}>
-              <View style={styles.contextTitleWrap}>
-                <Text
-                  variant="labelMedium"
-                  style={[
-                    styles.contextEyebrow,
-                    { color: theme.colors.primary },
-                  ]}
-                >
-                  {contextMenuItem?.type === 'file'
-                    ? 'File actions'
-                    : 'Folder actions'}
-                </Text>
-                <Text
-                  variant="headlineSmall"
-                  numberOfLines={1}
-                  style={styles.contextTitle}
-                >
-                  {contextMenuItem?.name ?? folderName}
-                </Text>
-              </View>
+            <View style={styles.titleBlock}>
+              <Text variant="headlineSmall" style={styles.titleText}>
+                {folderName}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.titleMeta,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {isFavoritesView
+                  ? `${fileCount} images`
+                  : `${folderCount} folders ${fileCount} files`}
+              </Text>
+            </View>
+            {!isFavoritesView && (
               <IconButton
                 icon={({ size }) => (
                   <LucideIcon
-                    icon={X}
+                    icon={isGridView ? List : Grid2x2}
                     size={size}
-                    color={theme.colors.onSurfaceVariant}
+                    color={theme.colors.onSurface}
                   />
                 )}
-                onPress={closeContextMenu}
+                onPress={() =>
+                  dispatch(setFolderViewMode(isGridView ? 'list' : 'grid'))
+                }
+                style={styles.toolbarIconButton}
               />
-            </View>
-
-            {contextMenuItem?.type === 'file' && (
-              <>
-                <Pressable
-                  style={[
-                    styles.contextAction,
-                    { backgroundColor: theme.colors.surface },
-                  ]}
-                  onPress={handleDownloadItem}
-                >
-                  <View
-                    style={[
-                      styles.contextIconWrap,
-                      {
-                        backgroundColor: theme.dark
-                          ? 'rgba(31, 111, 91, 0.22)'
-                          : 'rgba(31, 111, 91, 0.12)',
-                      },
-                    ]}
-                  >
-                    <LucideIcon
-                      icon={Download}
-                      size={22}
-                      color={theme.colors.primary}
-                    />
-                  </View>
-                  <View style={styles.contextActionText}>
-                    <Text variant="titleMedium">Download</Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Save this file on your device
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.contextAction,
-                    { backgroundColor: theme.colors.surface },
-                  ]}
-                  onPress={handleCopyLink}
-                >
-                  <View
-                    style={[
-                      styles.contextIconWrap,
-                      {
-                        backgroundColor: theme.dark
-                          ? 'rgba(59, 130, 246, 0.2)'
-                          : 'rgba(59, 130, 246, 0.12)',
-                      },
-                    ]}
-                  >
-                    <LucideIcon icon={Copy} size={22} color="#3b82f6" />
-                  </View>
-                  <View style={styles.contextActionText}>
-                    <Text variant="titleMedium">Copy link</Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Copy the direct link or path
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.contextAction,
-                    { backgroundColor: theme.colors.surface },
-                  ]}
-                  onPress={handleShareItem}
-                >
-                  <View
-                    style={[
-                      styles.contextIconWrap,
-                      {
-                        backgroundColor: theme.dark
-                          ? 'rgba(245, 158, 11, 0.2)'
-                          : 'rgba(245, 158, 11, 0.12)',
-                      },
-                    ]}
-                  >
-                    <LucideIcon icon={Share2} size={22} color="#f59e0b" />
-                  </View>
-                  <View style={styles.contextActionText}>
-                    <Text variant="titleMedium">Share</Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Send it with another app
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.contextAction,
-                    { backgroundColor: theme.colors.surface },
-                  ]}
-                  onPress={confirmMoveToRecycleBin}
-                >
-                  <View
-                    style={[
-                      styles.contextIconWrap,
-                      {
-                        backgroundColor: theme.dark
-                          ? 'rgba(239, 68, 68, 0.22)'
-                          : 'rgba(239, 68, 68, 0.12)',
-                      },
-                    ]}
-                  >
-                    <LucideIcon icon={Trash2} size={22} color="#ef4444" />
-                  </View>
-                  <View style={styles.contextActionText}>
-                    <Text variant="titleMedium">Move to Recycle Bin</Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Remove it from this folder without deleting permanently
-                    </Text>
-                  </View>
-                </Pressable>
-              </>
             )}
-
-            {contextMenuItem?.type === 'directory' && (
-              <>
-                <Pressable
-                  style={[
-                    styles.contextAction,
-                    { backgroundColor: theme.colors.surface },
-                  ]}
-                  onPress={confirmMoveToRecycleBin}
-                >
-                  <View
-                    style={[
-                      styles.contextIconWrap,
-                      {
-                        backgroundColor: theme.dark
-                          ? 'rgba(239, 68, 68, 0.22)'
-                          : 'rgba(239, 68, 68, 0.12)',
-                      },
-                    ]}
-                  >
-                    <LucideIcon icon={Trash2} size={22} color="#ef4444" />
-                  </View>
-                  <View style={styles.contextActionText}>
-                    <Text variant="titleMedium">Move to Recycle Bin</Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Send this folder and its contents to the recycle bin
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.pinAction,
-                    { borderColor: theme.colors.outline },
-                  ]}
-                  onPress={() => {
-                    dispatch(
-                      togglePinFolder({
-                        path: contextMenuItem.path,
-                        name: contextMenuItem.name,
-                      }),
-                    );
-                    closeContextMenu();
-                  }}
-                >
-                  <Text
-                    variant="titleSmall"
-                    style={{ color: theme.colors.onSurface }}
-                  >
-                    {pinnedFolders.some(
-                      folder => folder.path === contextMenuItem.path,
-                    )
-                      ? 'Unpin folder from sidebar'
-                      : 'Pin folder to sidebar'}
-                  </Text>
-                </Pressable>
-              </>
-            )}
+            <IconButton
+              icon={({ size }) => (
+                <LucideIcon
+                  icon={EllipsisVertical}
+                  size={size}
+                  color={theme.colors.onSurface}
+                />
+              )}
+              onPress={isFavoritesView ? refetchFavoriteImages : refetch}
+              disabled={
+                isFavoritesView ? isFavoriteImagesFetching : isFetching || !path
+              }
+              style={styles.toolbarIconButton}
+            />
           </View>
-        </Modal>
-      </Portal>
 
-    </Screen>
+        </View>
+
+        {!isFavoritesView && (
+          <View style={styles.breadcrumbsSection}>
+            <ScrollView
+              ref={breadcrumbScrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.breadcrumbsWrap}
+            >
+              <Pressable
+                style={styles.crumbPill}
+                onPress={() => navigation.getParent()?.navigate('Home')}
+              >
+                <Text variant="titleSmall" style={styles.crumbText}>
+                  Internal storage
+                </Text>
+              </Pressable>
+              {breadcrumbs.map((crumb, index) => (
+                <View key={crumb.path} style={styles.crumbItem}>
+                  <LucideIcon
+                    icon={ChevronRight}
+                    size={14}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Pressable
+                    style={styles.crumbPill}
+                    onPress={() =>
+                      navigation.push('Folders', {
+                        path: crumb.path,
+                        name: crumb.name,
+                      })
+                    }
+                  >
+                    <Text
+                      variant="titleSmall"
+                      style={[
+                        styles.crumbText,
+                        index === breadcrumbs.length - 1 && styles.crumbTextActive,
+                      ]}
+                    >
+                      {crumb.name}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <LoadingOverlay
+          visible={
+            isFavoritesView
+              ? isFavoriteImagesLoading || isFavoriteImagesFetching
+              : isLoading || isFetching
+          }
+          message={isFavoritesView ? 'Loading favourites...' : 'Browsing...'}
+        />
+        <LoadingOverlay visible={preparingFile} message="Preparing file..." />
+        <LoadingOverlay visible={downloadingItem} message="Downloading..." />
+        <LoadingOverlay visible={sharingItem} message="Preparing share..." />
+        <LoadingOverlay
+          visible={movingToRecycleBin}
+          message="Moving to recycle bin..."
+        />
+
+        {!path && !isFavoritesView ? (
+          <View style={styles.centerContent}>
+            <LucideIcon
+              icon={HardDrive}
+              size={48}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text variant="bodyLarge" style={styles.infoText}>
+              Select a drive from the Home screen to start browsing.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            key={`${folderViewMode}-${numColumns}`}
+            data={combinedData}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            numColumns={numColumns}
+            style={styles.list}
+            contentContainerStyle={[
+              styles.listContent,
+              isFavoritesView
+                ? styles.favoritesGridContent
+                : isGridView
+                ? styles.gridContent
+                : styles.listModeContent,
+            ]}
+            columnWrapperStyle={isGridView ? styles.columnWrapper : undefined}
+            removeClippedSubviews={Platform.OS === 'android'}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            updateCellsBatchingPeriod={60}
+            ListEmptyComponent={
+              !(isFavoritesView ? isFavoriteImagesLoading : isLoading) ? (
+                <View style={styles.centerContent}>
+                  <Text variant="bodyMedium" style={styles.emptyText}>
+                    {isFavoritesView
+                      ? favoriteImagesError
+                        ? 'Could not load favourites.'
+                        : 'No favourite images yet.'
+                      : 'This folder is empty.'}
+                  </Text>
+                </View>
+              ) : null
+            }
+          />
+        )}
+
+        <MediaViewerModal
+          visible={viewerVisible}
+          onClose={() => setViewerVisible(false)}
+          media={mediaList}
+          initialIndex={selectedMediaIndex}
+        />
+        <VideoViewerModal
+          visible={videoViewerVisible}
+          onClose={() => setVideoViewerVisible(false)}
+          video={selectedVideo}
+        />
+
+        <Portal>
+          <Modal
+            visible={Boolean(contextMenuItem)}
+            onDismiss={closeContextMenu}
+            contentContainerStyle={styles.contextModal}
+          >
+            <View
+              style={[
+                styles.contextSheet,
+                { backgroundColor: theme.colors.elevation.level3 },
+              ]}
+            >
+              <View style={styles.contextHandle} />
+              <View style={styles.contextHeader}>
+                <View style={styles.contextTitleWrap}>
+                  <Text
+                    variant="labelMedium"
+                    style={[
+                      styles.contextEyebrow,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    {contextMenuItem?.type === 'file'
+                      ? 'File actions'
+                      : 'Folder actions'}
+                  </Text>
+                  <Text
+                    variant="headlineSmall"
+                    numberOfLines={1}
+                    style={styles.contextTitle}
+                  >
+                    {contextMenuItem?.name ?? folderName}
+                  </Text>
+                </View>
+                <IconButton
+                  icon={({ size }) => (
+                    <LucideIcon
+                      icon={X}
+                      size={size}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                  )}
+                  onPress={closeContextMenu}
+                />
+              </View>
+
+              {contextMenuItem?.type === 'file' && (
+                <>
+                  <Pressable
+                    style={[
+                      styles.contextAction,
+                      { backgroundColor: theme.colors.surface },
+                    ]}
+                    onPress={handleDownloadItem}
+                  >
+                    <View
+                      style={[
+                        styles.contextIconWrap,
+                        {
+                          backgroundColor: theme.dark
+                            ? 'rgba(31, 111, 91, 0.22)'
+                            : 'rgba(31, 111, 91, 0.12)',
+                        },
+                      ]}
+                    >
+                      <LucideIcon
+                        icon={Download}
+                        size={22}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.contextActionText}>
+                      <Text variant="titleMedium">Download</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Save this file on your device
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.contextAction,
+                      { backgroundColor: theme.colors.surface },
+                    ]}
+                    onPress={handleCopyLink}
+                  >
+                    <View
+                      style={[
+                        styles.contextIconWrap,
+                        {
+                          backgroundColor: theme.dark
+                            ? 'rgba(59, 130, 246, 0.2)'
+                            : 'rgba(59, 130, 246, 0.12)',
+                        },
+                      ]}
+                    >
+                      <LucideIcon icon={Copy} size={22} color="#3b82f6" />
+                    </View>
+                    <View style={styles.contextActionText}>
+                      <Text variant="titleMedium">Copy link</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Copy the direct link or path
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.contextAction,
+                      { backgroundColor: theme.colors.surface },
+                    ]}
+                    onPress={handleShareItem}
+                  >
+                    <View
+                      style={[
+                        styles.contextIconWrap,
+                        {
+                          backgroundColor: theme.dark
+                            ? 'rgba(245, 158, 11, 0.2)'
+                            : 'rgba(245, 158, 11, 0.12)',
+                        },
+                      ]}
+                    >
+                      <LucideIcon icon={Share2} size={22} color="#f59e0b" />
+                    </View>
+                    <View style={styles.contextActionText}>
+                      <Text variant="titleMedium">Share</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Send it with another app
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.contextAction,
+                      { backgroundColor: theme.colors.surface },
+                    ]}
+                    onPress={confirmMoveToRecycleBin}
+                  >
+                    <View
+                      style={[
+                        styles.contextIconWrap,
+                        {
+                          backgroundColor: theme.dark
+                            ? 'rgba(239, 68, 68, 0.22)'
+                            : 'rgba(239, 68, 68, 0.12)',
+                        },
+                      ]}
+                    >
+                      <LucideIcon icon={Trash2} size={22} color="#ef4444" />
+                    </View>
+                    <View style={styles.contextActionText}>
+                      <Text variant="titleMedium">Move to Recycle Bin</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Remove it from this folder without deleting permanently
+                      </Text>
+                    </View>
+                  </Pressable>
+                </>
+              )}
+
+              {contextMenuItem?.type === 'directory' && (
+                <>
+                  <Pressable
+                    style={[
+                      styles.contextAction,
+                      { backgroundColor: theme.colors.surface },
+                    ]}
+                    onPress={confirmMoveToRecycleBin}
+                  >
+                    <View
+                      style={[
+                        styles.contextIconWrap,
+                        {
+                          backgroundColor: theme.dark
+                            ? 'rgba(239, 68, 68, 0.22)'
+                            : 'rgba(239, 68, 68, 0.12)',
+                        },
+                      ]}
+                    >
+                      <LucideIcon icon={Trash2} size={22} color="#ef4444" />
+                    </View>
+                    <View style={styles.contextActionText}>
+                      <Text variant="titleMedium">Move to Recycle Bin</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Send this folder and its contents to the recycle bin
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.pinAction,
+                      { borderColor: theme.colors.outline },
+                    ]}
+                    onPress={() => {
+                      dispatch(
+                        togglePinFolder({
+                          path: contextMenuItem.path,
+                          name: contextMenuItem.name,
+                        }),
+                      );
+                      closeContextMenu();
+                    }}
+                  >
+                    <Text
+                      variant="titleSmall"
+                      style={{ color: theme.colors.onSurface }}
+                    >
+                      {pinnedFolders.some(
+                        folder => folder.path === contextMenuItem.path,
+                      )
+                        ? 'Unpin folder from sidebar'
+                        : 'Pin folder to sidebar'}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </Modal>
+        </Portal>
+      </Screen>
+    </>
   );
 }
 
@@ -1235,26 +1419,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topPanel: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: '#232329',
+  },
+  favoritesTopPanel: {
+    paddingBottom: 12,
+  },
+  breadcrumbsSection: {
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    backgroundColor: '#181a20',
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
+    minHeight: 56,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: -6,
   },
   titleBlock: {
     flex: 1,
     paddingLeft: 4,
   },
   titleText: {
-    fontWeight: '700',
+    fontWeight: '500',
   },
   titleMeta: {
     marginTop: 2,
@@ -1266,24 +1462,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 18,
+    paddingTop: 10,
     paddingRight: 18,
-    paddingBottom: 10,
+    paddingBottom: 4,
   },
   crumbPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  crumbPillActive: {
-    backgroundColor: 'rgba(242,203,72,0.16)',
+  crumbItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
+  crumbPillActive: {},
   crumbText: {
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  crumbTextActive: {
+    color: '#dbe3ff',
+    fontWeight: '700',
   },
   filterRow: {
     flexDirection: 'row',
@@ -1308,10 +1506,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingTop: 8,
   },
+  favoritesGridContent: {
+    paddingHorizontal: 12,
+    paddingTop: 14,
+    paddingBottom: 120,
+  },
   listModeContent: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    gap: 10,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    gap: 2,
   },
   columnWrapper: {
     alignItems: 'flex-start',
@@ -1321,6 +1524,39 @@ const styles = StyleSheet.create({
   },
   tilePressable: {
     width: '100%',
+  },
+  favoriteTilePressable: {
+    width: '100%',
+    paddingHorizontal: 6,
+    paddingBottom: 12,
+  },
+  favoriteCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  favoriteImageWrap: {
+    aspectRatio: 0.86,
+    overflow: 'hidden',
+  },
+  favoriteImage: {
+    width: '100%',
+    height: '100%',
+  },
+  favoriteFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoriteCardBody: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  favoriteCardTitle: {
+    fontWeight: '700',
+  },
+  favoriteCardMeta: {
+    marginTop: 3,
   },
   gridTile: {
     alignItems: 'center',
@@ -1378,17 +1614,33 @@ const styles = StyleSheet.create({
   rowItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    backgroundColor: '#fff',
+    gap: 16,
+    borderRadius: 22,
+    paddingVertical: 12,
+    marginBottom: 4,
+  },
+  rowFolderGlyph: {
+    width: 62,
+    height: 62,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowFolderPin: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#232329',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowFileGlyph: {
-    width: 52,
-    height: 52,
-    borderRadius: 5,
+    width: 62,
+    height: 62,
+    borderRadius: 15,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1399,12 +1651,20 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flex: 1,
+    paddingRight: 8,
   },
   rowTitle: {
-    fontWeight: '600',
+    fontWeight: '500',
   },
   rowMeta: {
-    marginTop: 3,
+    marginTop: 4,
+  },
+  rowMenuButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -4,
   },
   centerContent: {
     flex: 1,

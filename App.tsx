@@ -44,8 +44,8 @@ function AppProviders() {
     <SafeAreaProvider>
       <PaperProvider theme={paperTheme}>
         <StatusBar
-          backgroundColor={paperTheme.colors.surface}
-          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor={paperTheme.colors.background}
+          barStyle={paperTheme.dark ? 'light-content' : 'dark-content'}
         />
         <NavigationContainer theme={navigationTheme}>
           {isAuthenticated ? <DrawerNavigator /> : <AuthScreen />}

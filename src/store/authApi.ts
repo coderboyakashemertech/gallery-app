@@ -15,14 +15,53 @@ import type {
   User,
 } from '../types/auth';
 import type { Drive } from '../types/drives';
-import type { DirectoryContentsResponse, GalleryFoldersResponse } from '../types/folders';
-import type { RootState } from './index';
+import type {
+  DirectoryContentsResponse,
+  DirectoryFile,
+  GalleryFoldersResponse,
+} from '../types/folders';
+
+type RecycleBinResponse = {
+  name: string;
+  path: string;
+} | null;
+
+type FavoriteImageResponse = {
+  id: string;
+  imageUrl: string;
+  createdAt: string;
+};
+
+type AuthStateWithToken = { auth: { token?: string | null } };
+
+const getImageExtension = (imageUrl: string) => {
+  const match = imageUrl.match(/(\.[a-z0-9]+)(?:\?|$)/i);
+  return match ? match[1].toLowerCase() : null;
+};
+
+const mapFavoriteImageToDirectoryFile = (
+  favoriteImage: FavoriteImageResponse,
+): DirectoryFile => {
+  const fallbackName = decodeURIComponent(
+    favoriteImage.imageUrl.split('/').pop() || 'Favourite image',
+  );
+
+  return {
+    type: 'file',
+    path: favoriteImage.id,
+    url: favoriteImage.imageUrl,
+    name: fallbackName,
+    size: 0,
+    extension: getImageExtension(favoriteImage.imageUrl),
+  };
+};
+
 console.log('🚀 ~ API_BASE_URL:', API_BASE_URL);
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.token;
+    const token = (getState() as AuthStateWithToken).auth.token;
     console.log("🚀 ~ token:", token)
 
     headers.set('Accept', 'application/json');
@@ -54,7 +93,7 @@ const baseQuery: BaseQueryFn<
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery,
-  tagTypes: ['Profile', 'Directory'],
+  tagTypes: ['Profile', 'Directory', 'Favorites'],
   endpoints: builder => ({
     register: builder.mutation<
       AuthPayload,
@@ -108,8 +147,28 @@ export const authApi = createApi({
     getDrives: builder.query<Drive[], void>({
       query: () => '/api/drives',
     }),
+    getRecycleBin: builder.query<RecycleBinResponse, void>({
+      query: () => '/api/drives/recycle-bin',
+    }),
     getGalleryFolders: builder.query<GalleryFoldersResponse, void>({
       query: () => '/api/gallery/folders',
+    }),
+    getFavoriteImages: builder.query<DirectoryFile[], void>({
+      query: () => '/api/favorites/images',
+      transformResponse: (response: FavoriteImageResponse[]) =>
+        response.map(mapFavoriteImageToDirectoryFile),
+      providesTags: ['Favorites'],
+    }),
+    saveFavoriteImage: builder.mutation<
+      FavoriteImageResponse,
+      { imageUrl: string }
+    >({
+      query: body => ({
+        url: '/api/favorites/images',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Favorites'],
     }),
     listDirectory: builder.query<DirectoryContentsResponse, { path: string }>({
       query: ({ path }) => `/api/drives/list?path=${path}`,
@@ -133,8 +192,11 @@ export const {
   useBeginTwoFactorSetupMutation,
   useDisableTwoFactorMutation,
   useGetDrivesQuery,
+  useGetRecycleBinQuery,
   useGetGalleryFoldersQuery,
+  useGetFavoriteImagesQuery,
   useListDirectoryQuery,
+  useSaveFavoriteImageMutation,
   useMoveItemToRecycleBinMutation,
   useGetProfileQuery,
   useLazyGetProfileQuery,

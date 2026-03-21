@@ -43,6 +43,7 @@ import { LucideIcon } from './LucideIcon';
 import { copyImageToClipboard } from '../native/imageClipboard';
 import { getDownloadDestination } from '../utils/downloads';
 import { ensureAndroidStoragePermission } from '../utils/storagePermissions';
+import { useSaveFavoriteImageMutation } from '../store/authApi';
 import { showToast } from '../utils/toast';
 
 type MediaItem = {
@@ -428,6 +429,8 @@ export function MediaViewerModal({
   const [downloadingItem, setDownloadingItem] = useState(false);
   const [openingExternally, setOpeningExternally] = useState(false);
   const [copyingImage, setCopyingImage] = useState(false);
+  const [savingFavorite, setSavingFavorite] = useState(false);
+  const [saveFavoriteImage] = useSaveFavoriteImageMutation();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<MediaItem>>(null);
@@ -493,8 +496,26 @@ export function MediaViewerModal({
     showToast(`${currentMedia.name} link copied`);
   };
 
-  const handleAddToFavorite = () => {
-    showToast('Added to favourite');
+  const handleAddToFavorite = async () => {
+    if (!currentMedia || savingFavorite) {
+      return;
+    }
+
+    setMenuVisible(false);
+    setSavingFavorite(true);
+
+    try {
+      await saveFavoriteImage({ imageUrl: currentMedia.path }).unwrap();
+      showToast('Added to favourites');
+    } catch (error: any) {
+      const message =
+        error?.data?.message ||
+        (typeof error?.data === 'string' ? error.data : null) ||
+        'Could not save this image to favourites.';
+      showToast(message);
+    } finally {
+      setSavingFavorite(false);
+    }
   };
 
   const handleCopyImage = async () => {
@@ -697,7 +718,7 @@ export function MediaViewerModal({
             onPress={() => setMenuVisible(false)}
           />
         ) : null}
-        {sharingItem || downloadingItem || openingExternally || copyingImage ? (
+        {sharingItem || downloadingItem || openingExternally || copyingImage || savingFavorite ? (
           <View style={styles.actionOverlay}>
             <ActivityIndicator size="large" color="#fff" />
           </View>
