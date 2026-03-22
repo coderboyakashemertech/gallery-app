@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   useWindowDimensions,
@@ -26,12 +27,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import Share from 'react-native-share';
-import { Text } from 'react-native-paper';
+import { Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Copy,
   ImageIcon,
   Download,
+  Folder,
   MoreVertical,
   Share2,
   Star,
@@ -43,7 +45,12 @@ import { LucideIcon } from './LucideIcon';
 import { copyImageToClipboard } from '../native/imageClipboard';
 import { getDownloadDestination } from '../utils/downloads';
 import { ensureAndroidStoragePermission } from '../utils/storagePermissions';
-import { useSaveFavoriteImageMutation } from '../store/authApi';
+import {
+  useCreateAlbumMutation,
+  useGetAlbumsQuery,
+  useSaveAlbumImageMutation,
+  useSaveFavoriteImageMutation,
+} from '../store/authApi';
 import { showToast } from '../utils/toast';
 
 type MediaItem = {
@@ -302,6 +309,7 @@ type HeaderProps = {
   media: MediaItem[];
   onClose: () => void;
   onAddToFavorite: () => void;
+  onAddToAlbum: () => void;
   onOpenMenu: () => void;
   menuVisible: boolean;
   onCopyImage: () => void;
@@ -317,6 +325,7 @@ function ViewerHeader({
   media,
   onClose,
   onAddToFavorite,
+  onAddToAlbum,
   onOpenMenu,
   menuVisible,
   onCopyImage,
@@ -358,6 +367,10 @@ function ViewerHeader({
         </View>
         {menuVisible ? (
           <View style={styles.dropdownMenu}>
+            <Pressable onPress={onAddToAlbum} style={styles.dropdownItem}>
+              <LucideIcon icon={Folder} color="#fff" size={16} />
+              <Text style={styles.dropdownText}>Add To Album</Text>
+            </Pressable>
             <Pressable onPress={onCopyImage} style={styles.dropdownItem}>
               <LucideIcon icon={ImageIcon} color="#fff" size={16} />
               <Text style={styles.dropdownText}>Copy Image</Text>
@@ -430,7 +443,17 @@ export function MediaViewerModal({
   const [openingExternally, setOpeningExternally] = useState(false);
   const [copyingImage, setCopyingImage] = useState(false);
   const [savingFavorite, setSavingFavorite] = useState(false);
+  const [albumSheetVisible, setAlbumSheetVisible] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
+  const [creatingAlbum, setCreatingAlbum] = useState(false);
+  const [savingAlbumImage, setSavingAlbumImage] = useState(false);
   const [saveFavoriteImage] = useSaveFavoriteImageMutation();
+  const [createAlbum] = useCreateAlbumMutation();
+  const [saveAlbumImage] = useSaveAlbumImageMutation();
+  const { data: albumsData, isLoading: loadingAlbums } = useGetAlbumsQuery(
+    undefined,
+    { skip: !visible },
+  );
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<MediaItem>>(null);
@@ -441,6 +464,8 @@ export function MediaViewerModal({
       setIsZoomed(false);
       setChromeVisible(true);
       setMenuVisible(false);
+      setAlbumSheetVisible(false);
+      setNewAlbumName('');
     }
   }, [visible, initialIndex]);
 
@@ -496,6 +521,16 @@ export function MediaViewerModal({
     showToast(`${currentMedia.name} link copied`);
   };
 
+  const closeAlbumSheet = () => {
+    setAlbumSheetVisible(false);
+    setNewAlbumName('');
+  };
+
+  const openAlbumSheet = () => {
+    setMenuVisible(false);
+    setAlbumSheetVisible(true);
+  };
+
   const handleAddToFavorite = async () => {
     if (!currentMedia || savingFavorite) {
       return;
@@ -518,6 +553,64 @@ export function MediaViewerModal({
       showToast(message);
     } finally {
       setSavingFavorite(false);
+    }
+  };
+
+  const handleAddToAlbum = async (albumId: number, albumName: string) => {
+    if (!currentMedia || savingAlbumImage || creatingAlbum) {
+      return;
+    }
+
+    setSavingAlbumImage(true);
+
+    try {
+      await saveAlbumImage({
+        albumId,
+        imageUrl: currentMedia.path,
+        name: currentMedia.name,
+      }).unwrap();
+      closeAlbumSheet();
+      showToast(`Added to ${albumName}`);
+    } catch (error: any) {
+      const message =
+        error?.data?.message ||
+        (typeof error?.data === 'string' ? error.data : null) ||
+        'Could not save this image to the album.';
+      showToast(message);
+    } finally {
+      setSavingAlbumImage(false);
+    }
+  };
+
+  const handleCreateAlbumAndAdd = async () => {
+    const trimmedName = newAlbumName.trim();
+
+    if (!currentMedia || !trimmedName || creatingAlbum || savingAlbumImage) {
+      if (!trimmedName) {
+        showToast('Album name is required.');
+      }
+      return;
+    }
+
+    setCreatingAlbum(true);
+
+    try {
+      const album = await createAlbum({ name: trimmedName }).unwrap();
+      await saveAlbumImage({
+        albumId: album.id,
+        imageUrl: currentMedia.path,
+        name: currentMedia.name,
+      }).unwrap();
+      closeAlbumSheet();
+      showToast(`Added to ${album.name}`);
+    } catch (error: any) {
+      const message =
+        error?.data?.message ||
+        (typeof error?.data === 'string' ? error.data : null) ||
+        'Could not create this album.';
+      showToast(message);
+    } finally {
+      setCreatingAlbum(false);
     }
   };
 
@@ -721,11 +814,81 @@ export function MediaViewerModal({
             onPress={() => setMenuVisible(false)}
           />
         ) : null}
-        {sharingItem || downloadingItem || openingExternally || copyingImage || savingFavorite ? (
+        {sharingItem || downloadingItem || openingExternally || copyingImage || savingFavorite || creatingAlbum || savingAlbumImage ? (
           <View style={styles.actionOverlay}>
             <ActivityIndicator size="large" color="#fff" />
           </View>
         ) : null}
+        {albumSheetVisible ? (
+          <>
+            <Pressable style={styles.albumBackdrop} onPress={closeAlbumSheet} />
+            <View style={[styles.albumSheet, { paddingBottom: bottomInset + 12 }]}>
+              <Text variant="titleMedium" style={styles.albumSheetTitle}>
+                Save To Album
+              </Text>
+              <Text variant="bodySmall" style={styles.albumSheetSubtitle}>
+                Create a new album or choose an existing one for this photo.
+              </Text>
+              <TextInput
+                mode="outlined"
+                label="New album name"
+                value={newAlbumName}
+                onChangeText={setNewAlbumName}
+                style={styles.albumInput}
+                theme={{ colors: { primary: '#fff', outline: '#4b5563' } }}
+                textColor="#fff"
+              />
+              <Pressable
+                onPress={handleCreateAlbumAndAdd}
+                style={({ pressed }) => [
+                  styles.albumPrimaryAction,
+                  pressed ? styles.albumPrimaryActionPressed : null,
+                ]}
+              >
+                <Text style={styles.albumPrimaryActionText}>
+                  {creatingAlbum ? 'Creating Album...' : 'Create And Add Photo'}
+                </Text>
+              </Pressable>
+              <Text variant="labelMedium" style={styles.albumSectionLabel}>
+                Existing albums
+              </Text>
+              {loadingAlbums ? (
+                <View style={styles.albumLoadingWrap}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.albumList}
+                  contentContainerStyle={styles.albumListContent}
+                >
+                  {(albumsData || []).length ? (albumsData || []).map(album => (
+                    <Pressable
+                      key={album.id}
+                      onPress={() => handleAddToAlbum(album.id, album.name)}
+                      style={({ pressed }) => [
+                        styles.albumRow,
+                        pressed ? styles.albumRowPressed : null,
+                      ]}
+                    >
+                      <View style={styles.albumRowIcon}>
+                        <LucideIcon icon={Folder} color="#fff" size={18} />
+                      </View>
+                      <View style={styles.albumRowCopy}>
+                        <Text style={styles.albumRowTitle}>{album.name}</Text>
+                        <Text style={styles.albumRowMeta}>
+                          {album.imageCount} photo{album.imageCount === 1 ? '' : 's'}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )) : (
+                    <Text style={styles.albumEmptyText}>No albums yet.</Text>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+          </>
+        ) : null}
+
         <FlatList
           key={`${width}-${height}`}
           ref={listRef}
@@ -755,6 +918,7 @@ export function MediaViewerModal({
               media={media}
               onClose={onClose}
               onAddToFavorite={handleAddToFavorite}
+              onAddToAlbum={openAlbumSheet}
               onOpenMenu={() => setMenuVisible(true)}
               menuVisible={menuVisible}
               onCopyImage={handleCopyImage}
@@ -851,6 +1015,103 @@ const styles = StyleSheet.create({
   menuBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
+  },
+  albumBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 6,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  albumSheet: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 0,
+    zIndex: 7,
+    borderRadius: 24,
+    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    maxHeight: '70%',
+  },
+  albumSheetTitle: {
+    color: '#fff',
+  },
+  albumSheetSubtitle: {
+    color: '#cbd5e1',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  albumInput: {
+    backgroundColor: '#111827',
+  },
+  albumPrimaryAction: {
+    marginTop: 12,
+    borderRadius: 14,
+    backgroundColor: '#2563eb',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumPrimaryActionPressed: {
+    opacity: 0.82,
+  },
+  albumPrimaryActionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  albumSectionLabel: {
+    color: '#cbd5e1',
+    marginTop: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  albumLoadingWrap: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumList: {
+    flexGrow: 0,
+  },
+  albumListContent: {
+    paddingBottom: 6,
+    gap: 8,
+  },
+  albumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  albumRowPressed: {
+    opacity: 0.82,
+  },
+  albumRowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  albumRowCopy: {
+    flex: 1,
+  },
+  albumRowTitle: {
+    color: '#fff',
+  },
+  albumRowMeta: {
+    color: '#9ca3af',
+    marginTop: 2,
+    fontSize: 12,
+  },
+  albumEmptyText: {
+    color: '#9ca3af',
+    paddingVertical: 8,
   },
   dropdownMenu: {
     position: 'absolute',

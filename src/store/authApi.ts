@@ -27,7 +27,24 @@ type RecycleBinResponse = {
 } | null;
 
 type FavoriteImageResponse = {
-  id: string;
+  id: number;
+  imageUrl: string;
+  name?: string | null;
+  createdAt: string;
+};
+
+export type AlbumSummary = {
+  id: number;
+  name: string;
+  imageCount: number;
+  coverImageUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AlbumImageResponse = {
+  id: number;
+  albumId: number;
   imageUrl: string;
   name?: string | null;
   createdAt: string;
@@ -40,20 +57,21 @@ const getImageExtension = (imageUrl: string) => {
   return match ? match[1].toLowerCase() : null;
 };
 
-const mapFavoriteImageToDirectoryFile = (
-  favoriteImage: FavoriteImageResponse,
+const getImageFallbackName = (imageUrl: string) =>
+  decodeURIComponent(imageUrl.split('/').pop() || 'Favourite image');
+
+const mapImageResponseToDirectoryFile = (
+  image: FavoriteImageResponse | AlbumImageResponse,
 ): DirectoryFile => {
-  const fallbackName = decodeURIComponent(
-    favoriteImage.imageUrl.split('/').pop() || 'Favourite image',
-  );
+  const fallbackName = getImageFallbackName(image.imageUrl);
 
   return {
     type: 'file',
-    path: favoriteImage.id,
-    url: favoriteImage.imageUrl,
-    name: favoriteImage.name || fallbackName,
+    path: String(image.id),
+    url: image.imageUrl,
+    name: image.name || fallbackName,
     size: 0,
-    extension: getImageExtension(favoriteImage.imageUrl),
+    extension: getImageExtension(image.imageUrl),
   };
 };
 
@@ -63,7 +81,7 @@ const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as AuthStateWithToken).auth.token;
-    console.log("🚀 ~ token:", token)
+    console.log('🚀 ~ token:', token);
 
     headers.set('Accept', 'application/json');
     headers.set('Content-Type', 'application/json');
@@ -94,7 +112,7 @@ const baseQuery: BaseQueryFn<
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery,
-  tagTypes: ['Profile', 'Directory', 'Favorites'],
+  tagTypes: ['Profile', 'Directory', 'Favorites', 'Albums'],
   endpoints: builder => ({
     register: builder.mutation<
       AuthPayload,
@@ -157,7 +175,7 @@ export const authApi = createApi({
     getFavoriteImages: builder.query<DirectoryFile[], void>({
       query: () => '/api/favorites/images',
       transformResponse: (response: FavoriteImageResponse[]) =>
-        response.map(mapFavoriteImageToDirectoryFile),
+        response.map(mapImageResponseToDirectoryFile),
       providesTags: ['Favorites'],
     }),
     saveFavoriteImage: builder.mutation<
@@ -171,12 +189,49 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['Favorites'],
     }),
+    getAlbums: builder.query<AlbumSummary[], void>({
+      query: () => '/api/albums',
+      providesTags: ['Albums'],
+    }),
+    createAlbum: builder.mutation<AlbumSummary, { name: string }>({
+      query: body => ({
+        url: '/api/albums',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Albums'],
+    }),
+    getAlbumImages: builder.query<DirectoryFile[], number>({
+      query: albumId => `/api/albums/${albumId}/images`,
+      transformResponse: (response: AlbumImageResponse[]) =>
+        response.map(mapImageResponseToDirectoryFile),
+      providesTags: ['Albums'],
+    }),
+    saveAlbumImage: builder.mutation<
+      AlbumImageResponse,
+      { albumId: number; imageUrl: string; name: string }
+    >({
+      query: ({ albumId, ...body }) => ({
+        url: `/api/albums/${albumId}/images`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Albums'],
+    }),
     listDirectory: builder.query<DirectoryContentsResponse, { path: string }>({
       query: ({ path }) => `/api/drives/list?path=${path}`,
-      providesTags: (_result, _error, { path }) => [{ type: 'Directory', id: path || 'root' }],
+      providesTags: (_result, _error, { path }) => [
+        { type: 'Directory', id: path || 'root' },
+      ],
     }),
     moveItemToRecycleBin: builder.mutation<
-      { moved: boolean; name: string; path: string; recyclePath: string; type: 'directory' | 'file' },
+      {
+        moved: boolean;
+        name: string;
+        path: string;
+        recyclePath: string;
+        type: 'directory' | 'file';
+      },
       { path: string; currentPath?: string }
     >({
       query: body => ({
@@ -184,24 +239,30 @@ export const authApi = createApi({
         method: 'POST',
         body: { path: body.path },
       }),
-      invalidatesTags: (_result, _error, { currentPath }) => [{ type: 'Directory', id: currentPath || 'root' }],
+      invalidatesTags: (_result, _error, { currentPath }) => [
+        { type: 'Directory', id: currentPath || 'root' },
+      ],
     }),
   }),
 });
 
 export const {
   useBeginTwoFactorSetupMutation,
+  useCreateAlbumMutation,
   useDisableTwoFactorMutation,
+  useGetAlbumImagesQuery,
+  useGetAlbumsQuery,
   useGetDrivesQuery,
-  useGetRecycleBinQuery,
-  useGetGalleryFoldersQuery,
   useGetFavoriteImagesQuery,
-  useListDirectoryQuery,
-  useSaveFavoriteImageMutation,
-  useMoveItemToRecycleBinMutation,
+  useGetGalleryFoldersQuery,
   useGetProfileQuery,
+  useGetRecycleBinQuery,
   useLazyGetProfileQuery,
+  useListDirectoryQuery,
   useLoginMutation,
+  useMoveItemToRecycleBinMutation,
   useRegisterMutation,
+  useSaveAlbumImageMutation,
+  useSaveFavoriteImageMutation,
   useVerifyTwoFactorSetupMutation,
 } = authApi;

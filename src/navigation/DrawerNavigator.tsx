@@ -26,6 +26,7 @@ import { Avatar, Divider, Text, useTheme } from 'react-native-paper';
 
 import { LucideIcon } from '../components/LucideIcon';
 import { FoldersScreen } from '../screens/FoldersScreen';
+import { AlbumsScreen } from '../screens/AlbumsScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -46,6 +47,7 @@ export type FoldersRouteParams = {
 export type RootDrawerParamList = {
   Home: undefined;
   Favorites: undefined;
+  Albums: undefined;
   FoldersStack: { screen?: string; params?: FoldersRouteParams };
   Settings: undefined;
 };
@@ -291,6 +293,13 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               onPress={() => props.navigation.navigate('Favorites')}
             />
             <DrawerListItem
+              label="Albums"
+              icon={Folder}
+              subtitle="Create your own collections"
+              focused={activeRoute === 'Albums'}
+              onPress={() => props.navigation.navigate('Albums')}
+            />
+            <DrawerListItem
               label="Trash"
               icon={Trash2}
               subtitle={trashSubtitle}
@@ -463,6 +472,18 @@ export function DrawerNavigator() {
           drawerLabel: 'Favourites',
           drawerIcon: ({ color, size }) => (
             <LucideIcon icon={Star} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="Albums"
+        component={AlbumsScreen}
+        options={{
+          headerShown: false,
+          title: 'Albums',
+          drawerLabel: 'Albums',
+          drawerIcon: ({ color, size }) => (
+            <LucideIcon icon={Folder} color={color} size={size} />
           ),
         }}
       />
