@@ -110,6 +110,15 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+
+    splits {
+        abi {
+            enable true        // Enables separate builds
+            reset()            // Clears default architectures
+            include "arm64-v8a" // ONLY include your phone's architecture
+            universalApk false  // Do not generate a giant "all-in-one" APK
+        }
+    }
 }
 
 dependencies {

@@ -978,10 +978,10 @@ export function FoldersScreen() {
       >
         <View
           style={[
-          styles.topPanel,
-          { paddingTop: insets.top + 8 },
-          isFavoritesView && styles.favoritesTopPanel,
-        ]}
+            styles.topPanel,
+            { paddingTop: insets.top + 8 },
+            isFavoritesView && styles.favoritesTopPanel,
+          ]}
         >
           <View style={styles.titleRow}>
             <Pressable
@@ -1000,7 +1000,7 @@ export function FoldersScreen() {
             </Pressable>
             <View style={styles.titleBlock}>
               <Text variant="headlineSmall" style={styles.titleText}>
-                {folderName}
+                {truncateLabel(folderName)}
               </Text>
               <Text
                 variant="bodySmall"
@@ -1044,7 +1044,6 @@ export function FoldersScreen() {
               style={styles.toolbarIconButton}
             />
           </View>
-
         </View>
 
         {!isFavoritesView && (
@@ -1083,7 +1082,8 @@ export function FoldersScreen() {
                       variant="titleSmall"
                       style={[
                         styles.crumbText,
-                        index === breadcrumbs.length - 1 && styles.crumbTextActive,
+                        index === breadcrumbs.length - 1 &&
+                          styles.crumbTextActive,
                       ]}
                     >
                       {crumb.name}

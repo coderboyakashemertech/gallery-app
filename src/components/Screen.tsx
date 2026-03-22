@@ -16,7 +16,7 @@ export function Screen({
   scrollable = true,
   style,
   noPadding = false,
-  edges = ['bottom', 'left', 'right']
+  edges = ['top', 'bottom', 'left', 'right']
 }: Props) {
   const contentStyle = [styles.content, noPadding && styles.noPadding];
 

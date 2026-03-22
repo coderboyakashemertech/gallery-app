@@ -7,12 +7,17 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { ImageIcon } from 'lucide-react-native';
 import { Text } from 'react-native-paper';
+
+import { LucideIcon } from '../components/LucideIcon';
 
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import { Screen } from '../components/Screen';
 import { useGetFavoriteImagesQuery } from '../store/authApi';
 import { DirectoryFile } from '../types/folders';
+
+const EMPTY_FAVORITE_IMAGES: DirectoryFile[] = [];
 
 function FavoriteTile({
   item,
@@ -21,13 +26,33 @@ function FavoriteTile({
   item: DirectoryFile;
   onPress: () => void;
 }) {
+  const [previewFailed, setPreviewFailed] = React.useState(false);
+
   return (
     <Pressable onPress={onPress} style={styles.tilePressable}>
-      <Image
-        source={{ uri: item.url }}
-        style={styles.tileImage}
-        resizeMode="cover"
-      />
+      {previewFailed ? (
+        <View style={styles.tileFallback}>
+          <LucideIcon icon={ImageIcon} color="#9aa0a6" size={28} />
+        </View>
+      ) : (
+        <Image
+          source={{ uri: item.url }}
+          style={styles.tileImage}
+          resizeMode="cover"
+          resizeMethod="resize"
+          progressiveRenderingEnabled={true}
+          fadeDuration={0}
+          onError={() => {
+            console.error('[FavoritesScreen:image] preview failed', {
+              name: item.name,
+              path: item.path,
+              url: item.url,
+              extension: item.extension,
+            });
+            setPreviewFailed(true);
+          }}
+        />
+      )}
     </Pressable>
   );
 }
@@ -38,7 +63,7 @@ export function FavoritesScreen() {
   const [viewerVisible, setViewerVisible] = React.useState(false);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
 
-  const favoriteImages = data || [];
+  const favoriteImages = data ?? EMPTY_FAVORITE_IMAGES;
   const media = React.useMemo(
     () => favoriteImages.map(item => ({ path: item.url, name: item.name })),
     [favoriteImages],
@@ -117,6 +142,11 @@ const styles = StyleSheet.create({
   tileImage: {
     width: '100%',
     height: '100%',
+  },
+  tileFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyState: {
     paddingTop: 48,

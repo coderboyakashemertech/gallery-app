@@ -29,6 +29,7 @@ type RecycleBinResponse = {
 type FavoriteImageResponse = {
   id: string;
   imageUrl: string;
+  name?: string | null;
   createdAt: string;
 };
 
@@ -50,7 +51,7 @@ const mapFavoriteImageToDirectoryFile = (
     type: 'file',
     path: favoriteImage.id,
     url: favoriteImage.imageUrl,
-    name: fallbackName,
+    name: favoriteImage.name || fallbackName,
     size: 0,
     extension: getImageExtension(favoriteImage.imageUrl),
   };
@@ -161,7 +162,7 @@ export const authApi = createApi({
     }),
     saveFavoriteImage: builder.mutation<
       FavoriteImageResponse,
-      { imageUrl: string }
+      { imageUrl: string; name: string }
     >({
       query: body => ({
         url: '/api/favorites/images',

@@ -505,7 +505,10 @@ export function MediaViewerModal({
     setSavingFavorite(true);
 
     try {
-      await saveFavoriteImage({ imageUrl: currentMedia.path }).unwrap();
+      await saveFavoriteImage({
+        imageUrl: currentMedia.path,
+        name: currentMedia.name,
+      }).unwrap();
       showToast('Added to favourites');
     } catch (error: any) {
       const message =
