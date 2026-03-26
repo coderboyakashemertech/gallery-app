@@ -12,6 +12,7 @@ import {
   Folder,
   HardDrive,
   House,
+  Image as ImageIcon,
   LogOut,
   Menu,
   Pin,
@@ -28,6 +29,7 @@ import { LucideIcon } from '../components/LucideIcon';
 import { FoldersScreen } from '../screens/FoldersScreen';
 import { AlbumsScreen } from '../screens/AlbumsScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
+import { GalleryScreen } from '../screens/GalleryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import {
@@ -48,6 +50,7 @@ export type RootDrawerParamList = {
   Home: undefined;
   Favorites: undefined;
   Albums: undefined;
+  Gallery: undefined;
   FoldersStack: { screen?: string; params?: FoldersRouteParams };
   Settings: undefined;
 };
@@ -182,7 +185,9 @@ function DrawerListItem({
           style={[
             styles.drawerRowLabel,
             compact && styles.drawerRowLabelCompact,
-            { color: focused ? theme.colors.onSurface : theme.colors.onSurface },
+            {
+              color: focused ? theme.colors.onSurface : theme.colors.onSurface,
+            },
           ]}
         >
           {label}
@@ -211,10 +216,13 @@ function AppDrawerMark() {
 
 function DrawerFooterLink({ label }: { label: string }) {
   return (
-    <Pressable accessibilityRole="button" style={({ pressed }) => [
-      styles.footerLink,
-      pressed ? styles.footerLinkPressed : null,
-    ]}>
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.footerLink,
+        pressed ? styles.footerLinkPressed : null,
+      ]}
+    >
       <Text variant="titleMedium" style={styles.footerLinkText}>
         {label}
       </Text>
@@ -235,7 +243,9 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const activeRoute = activeDrawerRoute?.name;
   const activeFoldersParams =
     activeDrawerRoute?.name === 'FoldersStack'
-      ? (activeDrawerRoute.params as RootDrawerParamList['FoldersStack'] | undefined)
+      ? (activeDrawerRoute.params as
+          | RootDrawerParamList['FoldersStack']
+          | undefined)
       : undefined;
   const activeFolderPath = activeFoldersParams?.params?.path;
   const isDriveActive = (drivePath: string) =>
@@ -256,7 +266,9 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
       {...props}
       contentContainerStyle={styles.drawerContentContainer}
     >
-      <View style={[styles.drawerShell, { backgroundColor: theme.colors.surface }]}>
+      <View
+        style={[styles.drawerShell, { backgroundColor: theme.colors.surface }]}
+      >
         <View>
           <View style={styles.drawerHeader}>
             <View style={styles.brandRow}>
@@ -270,7 +282,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                 </Text>
                 <Text
                   variant="bodyMedium"
-                  style={[styles.brandSubtitle, { color: theme.colors.onSurfaceVariant }]}
+                  style={[
+                    styles.brandSubtitle,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
                 >
                   {user?.name ?? 'Gallery Manager'}
                 </Text>
@@ -300,6 +315,13 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               onPress={() => props.navigation.navigate('Albums')}
             />
             <DrawerListItem
+              label="Gallery"
+              icon={ImageIcon}
+              subtitle="Browse folders from the gallery API"
+              focused={activeRoute === 'Gallery'}
+              onPress={() => props.navigation.navigate('Gallery')}
+            />
+            <DrawerListItem
               label="Trash"
               icon={Trash2}
               subtitle={trashSubtitle}
@@ -313,7 +335,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                   ? () => {
                       props.navigation.navigate('FoldersStack', {
                         screen: 'Folders',
-                        params: { path: recycleBin.path, name: recycleBin.name },
+                        params: {
+                          path: recycleBin.path,
+                          name: recycleBin.name,
+                        },
                       });
                     }
                   : undefined
@@ -323,12 +348,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               label="Settings"
               icon={Settings}
               focused={activeRoute === 'Settings'}
-              onPress={() => props.navigation.navigate('Settings')}
-            />
-            <DrawerListItem
-              label="Help & feedback"
-              icon={CircleHelp}
-              subtitle="Support and app information"
               onPress={() => props.navigation.navigate('Settings')}
             />
           </View>
@@ -354,7 +373,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                       color={theme.colors.onSurfaceVariant}
                       size={18}
                     />
-                    <Text variant="titleSmall" style={styles.locationsToggleText}>
+                    <Text
+                      variant="titleSmall"
+                      style={styles.locationsToggleText}
+                    >
                       Locations
                     </Text>
                   </View>
@@ -374,7 +396,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                         icon={HardDrive}
                         compact
                         focused={
-                          activeRoute === 'FoldersStack' && isDriveActive(drive.path)
+                          activeRoute === 'FoldersStack' &&
+                          isDriveActive(drive.path)
                         }
                         onPress={() => {
                           props.navigation.navigate('FoldersStack', {
@@ -391,7 +414,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                         icon={Pin}
                         compact
                         focused={
-                          activeRoute === 'FoldersStack' && activeFolderPath === folder.path
+                          activeRoute === 'FoldersStack' &&
+                          activeFolderPath === folder.path
                         }
                         onPress={() => {
                           props.navigation.navigate('FoldersStack', {
@@ -408,10 +432,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
           ) : null}
         </View>
 
-        <View style={styles.footerSection}>
+        {/* <View style={styles.footerSection}>
           <DrawerFooterLink label="Privacy Policy" />
           <DrawerFooterLink label="Terms & Conditions" />
-        </View>
+        </View> */}
       </View>
     </DrawerContentScrollView>
   );
@@ -484,6 +508,18 @@ export function DrawerNavigator() {
           drawerLabel: 'Albums',
           drawerIcon: ({ color, size }) => (
             <LucideIcon icon={Folder} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="Gallery"
+        component={GalleryScreen}
+        options={{
+          headerShown: false,
+          title: 'Gallery',
+          drawerLabel: 'Gallery',
+          drawerIcon: ({ color, size }) => (
+            <LucideIcon icon={ImageIcon} color={color} size={size} />
           ),
         }}
       />

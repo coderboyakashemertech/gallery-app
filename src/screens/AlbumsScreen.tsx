@@ -9,7 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, Folder, ImageIcon, Plus } from 'lucide-react-native';
+import { ArrowLeft, Folder, ImageIcon, Plus, RefreshCw } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Modal,
@@ -139,7 +139,7 @@ function AlbumImageTile({
 export function AlbumsScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const { data, isLoading, isFetching } = useGetAlbumsQuery();
+  const { data, isLoading, isFetching, refetch } = useGetAlbumsQuery();
   const [createVisible, setCreateVisible] = React.useState(false);
   const [albumName, setAlbumName] = React.useState('');
   const [selectedAlbum, setSelectedAlbum] = React.useState<AlbumSummary | null>(
@@ -153,6 +153,7 @@ export function AlbumsScreen() {
     data: albumImagesData,
     isLoading: isAlbumImagesLoading,
     isFetching: isAlbumImagesFetching,
+    refetch: refetchAlbumImages,
   } = useGetAlbumImagesQuery(selectedAlbum?.id ?? 0, {
     skip: !selectedAlbum,
   });
@@ -211,6 +212,15 @@ export function AlbumsScreen() {
   const tileWidth = Math.floor(
     (width - 32 - tileGap * (imageGridColumns - 1)) / imageGridColumns,
   );
+
+  const handleRefresh = () => {
+    if (selectedAlbum) {
+      refetchAlbumImages();
+      return;
+    }
+
+    refetch();
+  };
 
   const closeCreateModal = () => {
     setCreateVisible(false);
@@ -283,7 +293,26 @@ export function AlbumsScreen() {
           </Text>
         </View>
 
-        <View style={styles.headerSpacer} />
+        <Pressable
+          onPress={handleRefresh}
+          style={({ pressed }) => [
+            styles.refreshButton,
+            {
+              backgroundColor: theme.colors.surfaceVariant,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          {isFetching || isAlbumImagesFetching ? (
+            <ActivityIndicator size={16} />
+          ) : (
+            <LucideIcon
+              icon={RefreshCw}
+              color={theme.colors.onSurface}
+              size={16}
+            />
+          )}
+        </Pressable>
       </View>
 
       {selectedAlbum ? (
@@ -491,8 +520,12 @@ const styles = StyleSheet.create({
   topBarCopy: {
     flex: 1,
   },
-  headerSpacer: {
-    width: 38,
+  refreshButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',
