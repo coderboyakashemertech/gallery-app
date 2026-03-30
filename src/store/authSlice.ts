@@ -2,7 +2,6 @@ import type { SerializedError } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
-import { API_BASE_URL } from '../config/api';
 import type { TwoFactorSetup, User } from '../types/auth';
 import { authApi } from './authApi';
 
@@ -37,7 +36,7 @@ function getErrorMessage(error: FetchBaseQueryError | SerializedError | undefine
   }
 
   if ('status' in error && error.status === 'FETCH_ERROR') {
-    return `Unable to reach the API at ${API_BASE_URL}. Make sure the backend server is running and the app .env URL matches it.`;
+    return 'Unable to reach the selected API. Check the Local or Prod setting and make sure that backend is reachable.';
   }
 
   if ('status' in error && error.status === 'PARSING_ERROR') {

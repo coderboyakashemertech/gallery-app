@@ -26,23 +26,21 @@ import {
   Alert,
   Clipboard,
   FlatList,
-  Image,
   ListRenderItem,
   Platform,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
-  type NativeSyntheticEvent,
   useWindowDimensions,
   View,
-  type ImageErrorEventData,
 } from 'react-native';
 import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { IconButton, Modal, Portal, Text, useTheme } from 'react-native-paper';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import FastImage from 'react-native-fast-image';
 import Share from 'react-native-share';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
@@ -96,11 +94,8 @@ const isFileItem = (item: ContextMenuItem): item is DirectoryFile =>
 
 const logImagePreviewError = (
   item: DirectoryFile,
-  event: NativeSyntheticEvent<ImageErrorEventData>,
   surface: 'grid' | 'list',
 ) => {
-  const nativeEvent = event.nativeEvent;
-
   console.error(`${IMAGE_DEBUG_PREFIX} preview failed`, {
     surface,
     name: item.name,
@@ -109,8 +104,6 @@ const logImagePreviewError = (
     extension: item.extension,
     size: item.size,
     platform: Platform.OS,
-    error: nativeEvent.error,
-    nativeEvent,
   });
 };
 
@@ -290,15 +283,12 @@ const FileGridItem = React.memo(
             ]}
           >
             {shouldShowPreview ? (
-              <Image
+              <FastImage
                 source={{ uri: item.url }}
                 style={styles.filePreview}
-                resizeMode="cover"
-                resizeMethod="resize"
-                progressiveRenderingEnabled={true}
-                fadeDuration={0}
-                onError={err => {
-                  logImagePreviewError(item, err, 'grid');
+                resizeMode={FastImage.resizeMode.cover}
+                onError={() => {
+                  logImagePreviewError(item, 'grid');
                   setPreviewFailed(true);
                 }}
               />
@@ -429,15 +419,12 @@ const FavoriteGalleryItem = React.memo(
         >
           <View style={styles.favoriteImageWrap}>
             {!previewFailed ? (
-              <Image
+              <FastImage
                 source={{ uri: item.url }}
                 style={styles.favoriteImage}
-                resizeMode="cover"
-                resizeMethod="resize"
-                progressiveRenderingEnabled={true}
-                fadeDuration={0}
-                onError={err => {
-                  logImagePreviewError(item, err, 'grid');
+                resizeMode={FastImage.resizeMode.cover}
+                onError={() => {
+                  logImagePreviewError(item, 'grid');
                   setPreviewFailed(true);
                 }}
               />
@@ -514,15 +501,12 @@ const FileListItem = React.memo(
           ]}
         >
           {shouldShowPreview ? (
-            <Image
+            <FastImage
               source={{ uri: item.url }}
               style={styles.rowFilePreview}
-              resizeMode="cover"
-              resizeMethod="resize"
-              progressiveRenderingEnabled={true}
-              fadeDuration={0}
-              onError={err => {
-                logImagePreviewError(item, err, 'list');
+              resizeMode={FastImage.resizeMode.cover}
+              onError={() => {
+                logImagePreviewError(item, 'list');
                 setPreviewFailed(true);
               }}
             />

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   ChevronsRight,
   Play,
+  Settings,
   Sparkles,
   UserRoundPlus,
 } from 'lucide-react-native';
@@ -13,10 +14,15 @@ import { LucideIcon } from '../../components/LucideIcon';
 
 type Props = {
   onCreateAccount: () => void;
+  onOpenSettings: () => void;
   onStart: () => void;
 };
 
-export function AuthWelcomeScreen({ onCreateAccount, onStart }: Props) {
+export function AuthWelcomeScreen({
+  onCreateAccount,
+  onOpenSettings,
+  onStart,
+}: Props) {
   const theme = useTheme();
   const heroBackground = theme.dark
     ? theme.colors.primaryContainer
@@ -32,11 +38,28 @@ export function AuthWelcomeScreen({ onCreateAccount, onStart }: Props) {
         { backgroundColor: theme.colors.background },
       ]}>
       <View style={styles.content}>
-        <Text
-          variant="titleLarge"
-          style={[styles.brand, { color: theme.colors.surfaceTint }]}>
-          Gallery
-        </Text>
+        <View style={styles.topBar}>
+          <View style={styles.topBarSpacer} />
+          <Text
+            variant="titleLarge"
+            style={[styles.brand, { color: theme.colors.primary }]}>
+            Gallery
+          </Text>
+          <Pressable
+            accessibilityLabel="Open settings"
+            accessibilityRole="button"
+            onPress={onOpenSettings}
+            style={[
+              styles.topBarButton,
+              { backgroundColor: theme.colors.surface },
+            ]}>
+            <LucideIcon
+              color={theme.colors.onSurface}
+              icon={Settings}
+              size={18}
+            />
+          </Pressable>
+        </View>
 
         <View style={[styles.heroCard, { backgroundColor: heroBackground }]}>
           <View
@@ -171,6 +194,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 24,
+  },
+  topBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  topBarButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  topBarSpacer: {
+    height: 40,
+    width: 40,
   },
   brand: {
     fontWeight: '800',

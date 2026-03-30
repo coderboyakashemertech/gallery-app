@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Settings } from 'lucide-react-native';
 import { Surface, Text, useTheme } from 'react-native-paper';
 
 import { LucideIcon } from '../../components/LucideIcon';
@@ -18,6 +18,7 @@ type Props = {
   children: ReactNode;
   footer?: ReactNode;
   onBack?: () => void;
+  onSettings?: () => void;
   subtitle?: string;
   title: string;
 };
@@ -26,6 +27,7 @@ export function AuthLayout({
   children,
   footer,
   onBack,
+  onSettings,
   subtitle,
   title,
 }: Props) {
@@ -40,7 +42,7 @@ export function AuthLayout({
         style={styles.keyboardWrap}
       >
         <ScrollView
-          style={{ flex: 1 }} // This ensures the scroll area fills the KAV
+          style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -87,7 +89,26 @@ export function AuthLayout({
               Gallery
             </Text>
 
-            <View style={styles.backSpacer} />
+            {onSettings ? (
+              <Pressable
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+                hitSlop={12}
+                onPress={onSettings}
+                style={[
+                  styles.backButton,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+              >
+                <LucideIcon
+                  color={theme.colors.onSurface}
+                  icon={Settings}
+                  size={18}
+                />
+              </Pressable>
+            ) : (
+              <View style={styles.backSpacer} />
+            )}
           </View>
 
           <Surface
@@ -142,6 +163,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 24,
     paddingVertical: 24,
+  },
+  scrollView: {
+    flex: 1,
   },
   glowTop: {
     borderRadius: 140,

@@ -14,7 +14,11 @@ import { clearAuthError, logout } from '../../store/authSlice';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { AuthLayout } from './AuthLayout';
 
-export function TwoFactorScreen() {
+type Props = {
+  onOpenSettings: () => void;
+};
+
+export function TwoFactorScreen({ onOpenSettings }: Props) {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const { error, pendingLogin, requestStatus, user } = useAppSelector(
@@ -58,6 +62,7 @@ export function TwoFactorScreen() {
   return (
     <AuthLayout
       onBack={() => dispatch(logout())}
+      onSettings={onOpenSettings}
       subtitle="A second security step is required before we can open your gallery workspace."
       title="Verify your login">
       <View

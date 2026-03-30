@@ -18,6 +18,7 @@ import { AuthLayout } from './AuthLayout';
 
 type Props = {
   onGoToLogin: () => void;
+  onOpenSettings: () => void;
 };
 
 function VisiblePasswordIcon({ color, size }: { color: string; size: number }) {
@@ -28,7 +29,7 @@ function HiddenPasswordIcon({ color, size }: { color: string; size: number }) {
   return <LucideIcon color={color} icon={Eye} size={size} />;
 }
 
-export function SignupScreen({ onGoToLogin }: Props) {
+export function SignupScreen({ onGoToLogin, onOpenSettings }: Props) {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const { error, requestStatus } = useAppSelector(state => state.auth);
@@ -90,8 +91,8 @@ export function SignupScreen({ onGoToLogin }: Props) {
         password,
         username: username.trim().toLowerCase(),
       }).unwrap();
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.log(err);
       // Errors are handled by auth slice state.
     }
   };
@@ -99,6 +100,7 @@ export function SignupScreen({ onGoToLogin }: Props) {
   return (
     <AuthLayout
       onBack={onGoToLogin}
+      onSettings={onOpenSettings}
       subtitle="Create your account to unlock the gallery dashboard and protected API actions."
       title="Create an account?">
       <View style={styles.fieldGroup}>

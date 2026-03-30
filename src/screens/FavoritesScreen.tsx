@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import { ImageIcon } from 'lucide-react-native';
 import { Text } from 'react-native-paper';
+import FastImage from 'react-native-fast-image';
 
 import { LucideIcon } from '../components/LucideIcon';
 
@@ -35,13 +35,10 @@ function FavoriteTile({
           <LucideIcon icon={ImageIcon} color="#9aa0a6" size={28} />
         </View>
       ) : (
-        <Image
+        <FastImage
           source={{ uri: item.url }}
           style={styles.tileImage}
-          resizeMode="cover"
-          resizeMethod="resize"
-          progressiveRenderingEnabled={true}
-          fadeDuration={0}
+          resizeMode={FastImage.resizeMode.cover}
           onError={() => {
             console.error('[FavoritesScreen:image] preview failed', {
               name: item.name,

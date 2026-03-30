@@ -8,9 +8,12 @@ Start from [`app/.env.example`](/home/coderboy/projects/Gallery/app/.env.example
 Available variables:
 
 - `APP_ENV`: simple app environment label shown in the UI.
-- `API_BASE_URL_ANDROID`: API URL used on Android.
-- `API_BASE_URL_IOS`: API URL used on iOS.
-- `API_BASE_URL_DEFAULT`: fallback URL for other platforms.
+- `LOCAL_API_BASE_URL_ANDROID`: local API URL used on Android.
+- `LOCAL_API_BASE_URL_IOS`: local API URL used on iOS.
+- `LOCAL_API_BASE_URL_DEFAULT`: local fallback URL for other platforms.
+- `PROD_API_BASE_URL_ANDROID`: production API URL used on Android.
+- `PROD_API_BASE_URL_IOS`: production API URL used on iOS.
+- `PROD_API_BASE_URL_DEFAULT`: production fallback URL for other platforms.
 
 Default local values:
 
@@ -19,7 +22,7 @@ Default local values:
 
 If you run the app on a physical device, replace these with your machine's LAN IP, for example `http://192.168.1.25:3000`.
 
-After changing `.env`, restart Metro so Babel picks up the new values.
+You can switch between `Local` and `Prod` from the app Settings screen. After changing `.env`, restart Metro so Babel picks up the new values.
 
 # Getting Started
 

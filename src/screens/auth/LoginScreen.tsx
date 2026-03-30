@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Eye, EyeOff, RectangleEllipsisIcon } from 'lucide-react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Button,
@@ -18,6 +18,7 @@ import { AuthLayout } from './AuthLayout';
 
 type Props = {
   onCreateAccount: () => void;
+  onOpenSettings: () => void;
 };
 
 function VisiblePasswordIcon({ color, size }: { color: string; size: number }) {
@@ -28,7 +29,7 @@ function HiddenPasswordIcon({ color, size }: { color: string; size: number }) {
   return <LucideIcon color={color} icon={Eye} size={size} />;
 }
 
-export function LoginScreen({ onCreateAccount }: Props) {
+export function LoginScreen({ onCreateAccount, onOpenSettings }: Props) {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const { error, requestStatus } = useAppSelector(state => state.auth);
@@ -69,6 +70,7 @@ export function LoginScreen({ onCreateAccount }: Props) {
 
   return (
     <AuthLayout
+      onSettings={onOpenSettings}
       subtitle="Welcome back. Sign in to reach your collections, settings, and two-factor protected actions."
       title="Welcome to Gallery"
     >

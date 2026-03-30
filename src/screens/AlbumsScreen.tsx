@@ -3,13 +3,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   BackHandler,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { ArrowLeft, Folder, ImageIcon, Plus, RefreshCw } from 'lucide-react-native';
+import FastImage from 'react-native-fast-image';
 import {
   ActivityIndicator,
   Modal,
@@ -60,10 +60,10 @@ function AlbumCard({
         ]}
       >
         {album.coverImageUrl && !previewFailed ? (
-          <Image
+          <FastImage
             source={{ uri: album.coverImageUrl }}
             style={styles.albumCoverImage}
-            resizeMode="cover"
+            resizeMode={FastImage.resizeMode.cover}
             onError={() => setPreviewFailed(true)}
           />
         ) : (
@@ -122,13 +122,10 @@ function AlbumImageTile({
           />
         </View>
       ) : (
-        <Image
+        <FastImage
           source={{ uri: item.url }}
           style={styles.tileImage}
-          resizeMode="cover"
-          resizeMethod="resize"
-          progressiveRenderingEnabled={true}
-          fadeDuration={0}
+          resizeMode={FastImage.resizeMode.cover}
           onError={() => setPreviewFailed(true)}
         />
       )}

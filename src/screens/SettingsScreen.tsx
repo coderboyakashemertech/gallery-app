@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import React, { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AtSign, ShieldCheck, UserRound } from 'lucide-react-native';
 import {
   ActivityIndicator,
@@ -13,10 +13,13 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
+import FastImage from 'react-native-fast-image';
 
+import { ApiEnvironmentSelector } from '../components/ApiEnvironmentSelector';
 import { FormMessage } from '../components/FormMessage';
 import { LucideIcon } from '../components/LucideIcon';
 import { Screen } from '../components/Screen';
+import type { ApiEnvironment } from '../config/api';
 import {
   authApi,
   useBeginTwoFactorSetupMutation,
@@ -26,7 +29,10 @@ import {
 } from '../store/authApi';
 import { clearAuthError, logout } from '../store/authSlice';
 import { useAppDispatch, useAppSelector } from '../store';
-import { toggleDarkMode } from '../store/preferencesSlice';
+import {
+  setApiEnvironment,
+  toggleDarkMode,
+} from '../store/preferencesSlice';
 
 type ListIconProps = Omit<ComponentProps<typeof List.Icon>, 'icon'>;
 
@@ -60,8 +66,10 @@ export function SettingsScreen() {
   const { error, requestStatus, twoFactorSetup, user } = useAppSelector(
     state => state.auth,
   );
-  console.log('🚀 ~ SettingsScreen ~ twoFactorSetup:', twoFactorSetup?.secret);
   const token = useAppSelector(state => state.auth.token);
+  const apiEnvironment = useAppSelector(
+    state => state.preferences.apiEnvironment,
+  );
   const isDarkMode = useAppSelector(state => state.preferences.isDarkMode);
   const [enableOtp, setEnableOtp] = useState('');
   const [disableOtp, setDisableOtp] = useState('');
@@ -76,14 +84,12 @@ export function SettingsScreen() {
   const onStart2FA = async () => {
     dispatch(clearAuthError());
     setEnableOtp('');
-    const res = await beginTwoFactorSetup().unwrap();
-    console.log(res?.qrCodeDataUrl)
+    await beginTwoFactorSetup().unwrap();
   };
 
   const onVerify2FA = async () => {
     dispatch(clearAuthError());
-    const res = await verifyTwoFactorSetup({ otp: enableOtp }).unwrap();
-    // console.log('🚀 ~ onVerify2FA ~ res:', res);
+    await verifyTwoFactorSetup({ otp: enableOtp }).unwrap();
   };
 
   const onDisable2FA = async () => {
@@ -112,6 +118,16 @@ export function SettingsScreen() {
 
   const onPressDisable2FA = () => {
     onDisable2FA().catch(() => { });
+  };
+
+  const onChangeApiEnvironment = (nextEnvironment: ApiEnvironment) => {
+    if (nextEnvironment === apiEnvironment) {
+      return;
+    }
+
+    dispatch(setApiEnvironment(nextEnvironment));
+    dispatch(logout());
+    dispatch(authApi.util.resetApiState());
   };
 
   return (
@@ -146,6 +162,15 @@ export function SettingsScreen() {
               }}
             />
           </View>
+        </Card.Content>
+      </Card>
+
+      <Card mode="contained" style={styles.card}>
+        <Card.Content style={styles.section}>
+          <ApiEnvironmentSelector
+            apiEnvironment={apiEnvironment}
+            onChange={onChangeApiEnvironment}
+          />
         </Card.Content>
       </Card>
 
@@ -206,9 +231,11 @@ export function SettingsScreen() {
               </Button>
               {twoFactorSetup ? (
                 <>
-                  <Image
+                  <FastImage
                     source={{ uri: twoFactorSetup.qrCodeDataUrl }}
                     style={styles.qrCode}
+                    resizeMode={FastImage.resizeMode.contain}
+                    fallback={twoFactorSetup.qrCodeDataUrl.startsWith('data:')}
                   />
                   <Text
                     selectable

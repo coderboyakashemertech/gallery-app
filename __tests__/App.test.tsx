@@ -8,9 +8,12 @@ import 'react-native-gesture-handler/jestSetup';
 
 jest.mock('@env', () => ({
   APP_ENV: 'test',
-  API_BASE_URL_ANDROID: 'http://10.0.2.2:3000',
-  API_BASE_URL_IOS: 'http://127.0.0.1:3000',
-  API_BASE_URL_DEFAULT: 'http://127.0.0.1:3000',
+  LOCAL_API_BASE_URL_ANDROID: 'http://10.0.2.2:3000',
+  LOCAL_API_BASE_URL_IOS: 'http://127.0.0.1:3000',
+  LOCAL_API_BASE_URL_DEFAULT: 'http://127.0.0.1:3000',
+  PROD_API_BASE_URL_ANDROID: 'https://api.example.com',
+  PROD_API_BASE_URL_IOS: 'https://api.example.com',
+  PROD_API_BASE_URL_DEFAULT: 'https://api.example.com',
 }), { virtual: true });
 
 jest.mock('react-native-reanimated', () =>
@@ -35,11 +38,17 @@ jest.mock('../src/store', () => {
       token: null,
     },
     preferences: {
+      apiEnvironment: 'local',
       isDarkMode: false,
     },
   };
 
   return {
+    persistor: {
+      dispatch: jest.fn(),
+      getState: () => ({ bootstrapped: true }),
+      subscribe: () => () => {},
+    },
     store: {
       getState: () => mockState,
       subscribe: () => () => {},

@@ -6,7 +6,11 @@ import {
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
 
-import { API_BASE_URL } from '../config/api';
+import {
+  getApiBaseUrl,
+  resolveApiEnvironment,
+  type ApiEnvironment,
+} from '../config/api';
 import type {
   ApiSuccessResponse,
   AuthPayload,
@@ -51,6 +55,9 @@ type AlbumImageResponse = {
 };
 
 type AuthStateWithToken = { auth: { token?: string | null } };
+type StateWithPreferences = AuthStateWithToken & {
+  preferences?: { apiEnvironment?: ApiEnvironment };
+};
 
 const getImageExtension = (imageUrl: string) => {
   const match = imageUrl.match(/(\.[a-z0-9]+)(?:\?|$)/i);
@@ -75,13 +82,9 @@ const mapImageResponseToDirectoryFile = (
   };
 };
 
-console.log('🚀 ~ API_BASE_URL:', API_BASE_URL);
-
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: API_BASE_URL,
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as AuthStateWithToken).auth.token;
-    console.log('🚀 ~ token:', token);
 
     headers.set('Accept', 'application/json');
     headers.set('Content-Type', 'application/json');
@@ -99,7 +102,16 @@ const baseQuery: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  const result = await rawBaseQuery(args, api, extraOptions);
+  const state = api.getState() as StateWithPreferences;
+  const apiEnvironment = resolveApiEnvironment(
+    state.preferences?.apiEnvironment,
+  );
+  const baseUrl = getApiBaseUrl(apiEnvironment);
+  const request =
+    typeof args === 'string'
+      ? { url: `${baseUrl}${args}` }
+      : { ...args, url: `${baseUrl}${args.url}` };
+  const result = await rawBaseQuery(request, api, extraOptions);
 
   if (result.error) {
     return result;

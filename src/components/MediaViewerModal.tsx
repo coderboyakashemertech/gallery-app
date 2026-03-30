@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Clipboard,
   FlatList,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import {
   Gesture,
   GestureDetector,
@@ -284,10 +284,10 @@ function ZoomableImage({
       ) : null}
       <GestureDetector gesture={composedGesture}>
         <Animated.View style={animatedStyle}>
-          <Image
+          <FastImage
             source={{ uri: item.path }}
             style={[styles.image, { width, height }]}
-            resizeMode="contain"
+            resizeMode={FastImage.resizeMode.contain}
             onLoadStart={() => {
               setIsLoading(true);
             }}
@@ -434,6 +434,7 @@ export function MediaViewerModal({
   media,
   initialIndex,
 }: Props) {
+  const initialMediaPath = media[initialIndex]?.path ?? '';
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isZoomed, setIsZoomed] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -467,7 +468,7 @@ export function MediaViewerModal({
       setAlbumSheetVisible(false);
       setNewAlbumName('');
     }
-  }, [visible, initialIndex]);
+  }, [visible, initialIndex, initialMediaPath]);
 
   useEffect(() => {
     if (!visible) {
@@ -480,7 +481,7 @@ export function MediaViewerModal({
         animated: false,
       });
     });
-  }, [initialIndex, visible]);
+  }, [initialIndex, initialMediaPath, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -890,7 +891,7 @@ export function MediaViewerModal({
         ) : null}
 
         <FlatList
-          key={`${width}-${height}`}
+          key={`${width}-${height}-${initialMediaPath}`}
           ref={listRef}
           data={media}
           renderItem={renderItem}

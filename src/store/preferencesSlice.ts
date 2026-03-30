@@ -1,5 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+import {
+  DEFAULT_API_ENVIRONMENT,
+  type ApiEnvironment,
+} from '../config/api';
+
 export type SavedFolder = {
   path: string;
   name: string;
@@ -11,6 +16,7 @@ export type FavoriteFolder = SavedFolder;
 export type FolderViewMode = 'grid' | 'list';
 
 type PreferencesState = {
+  apiEnvironment: ApiEnvironment;
   isDarkMode: boolean;
   pinnedFolders: PinnedFolder[];
   favoriteFolders: FavoriteFolder[];
@@ -18,6 +24,7 @@ type PreferencesState = {
 };
 
 const initialState: PreferencesState = {
+  apiEnvironment: DEFAULT_API_ENVIRONMENT,
   isDarkMode: false,
   pinnedFolders: [],
   favoriteFolders: [],
@@ -28,6 +35,9 @@ const preferencesSlice = createSlice({
   name: 'preferences',
   initialState,
   reducers: {
+    setApiEnvironment(state, action: { payload: ApiEnvironment }) {
+      state.apiEnvironment = action.payload;
+    },
     toggleDarkMode(state) {
       state.isDarkMode = !state.isDarkMode;
     },
@@ -62,6 +72,7 @@ const preferencesSlice = createSlice({
 });
 
 export const {
+  setApiEnvironment,
   toggleDarkMode,
   setFolderViewMode,
   togglePinFolder,

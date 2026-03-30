@@ -1,7 +1,13 @@
-import { API_BASE_URL } from '../config/api';
+import {
+  DEFAULT_API_ENVIRONMENT,
+  getApiBaseUrl,
+  resolveApiEnvironment,
+  type ApiEnvironment,
+} from '../config/api';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/auth';
 
 type RequestOptions = {
+  apiEnvironment?: ApiEnvironment | null;
   body?: unknown;
   method?: 'GET' | 'POST';
   token?: string | null;
@@ -19,17 +25,23 @@ export class ApiRequestError extends Error {
 
 export async function apiRequest<T>(
   path: string,
-  { body, method = 'GET', token }: RequestOptions = {},
+  { apiEnvironment, body, method = 'GET', token }: RequestOptions = {},
 ) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const resolvedEnvironment = resolveApiEnvironment(
+    apiEnvironment ?? DEFAULT_API_ENVIRONMENT,
+  );
+  const response = await fetch(
+    `${getApiBaseUrl(resolvedEnvironment)}${path}`,
+    {
+      method,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  );
 
   const json = (await response.json()) as
     | ApiSuccessResponse<T>
