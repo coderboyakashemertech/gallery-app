@@ -19,10 +19,12 @@ import type {
   User,
 } from '../types/auth';
 import type { Drive } from '../types/drives';
+import { normalizeGalleryFoldersResponse } from '../types/folders';
 import type {
   DirectoryContentsResponse,
   DirectoryFile,
   GalleryFoldersResponse,
+  RawGalleryFoldersResponse,
 } from '../types/folders';
 
 type RecycleBinResponse = {
@@ -183,6 +185,8 @@ export const authApi = createApi({
     }),
     getGalleryFolders: builder.query<GalleryFoldersResponse, void>({
       query: () => '/api/gallery/folders',
+      transformResponse: (response: RawGalleryFoldersResponse) =>
+        normalizeGalleryFoldersResponse(response),
     }),
     getFavoriteImages: builder.query<DirectoryFile[], void>({
       query: () => '/api/favorites/images',

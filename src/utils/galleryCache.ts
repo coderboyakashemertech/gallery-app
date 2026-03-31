@@ -1,11 +1,14 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import type { ApiEnvironment } from '../config/api';
-import type { GalleryFoldersResponse } from '../types/folders';
+import {
+  normalizeGalleryFoldersResponse,
+  type GalleryFoldersResponse,
+  type RawGalleryFoldersResponse,
+} from '../types/folders';
+import { getStoredString, setStoredString } from './storage';
 
 type GalleryCacheRecord = {
-  galleryData: GalleryFoldersResponse;
-  previewUrls: Record<string, string | null>;
+  galleryData: RawGalleryFoldersResponse;
+  previewUrls?: Record<string, string | null>;
   savedAt: number;
 };
 
@@ -21,27 +24,40 @@ export async function readGalleryCache(
   userKey?: string,
 ) {
   try {
-    const raw = await AsyncStorage.getItem(
-      getGalleryCacheKey(apiEnvironment, userKey),
-    );
+    const raw = await getStoredString(getGalleryCacheKey(apiEnvironment, userKey));
 
     if (!raw) {
       return null;
     }
 
     const parsed = JSON.parse(raw) as GalleryCacheRecord;
+    const normalizedGalleryData = normalizeGalleryFoldersResponse(
+      parsed.galleryData,
+    );
 
     if (
       !parsed ||
       !parsed.galleryData ||
-      !Array.isArray(parsed.galleryData.folders) ||
-      typeof parsed.previewUrls !== 'object' ||
-      !parsed.previewUrls
+      !Array.isArray(normalizedGalleryData.folders)
     ) {
       return null;
     }
 
-    return parsed;
+    if (parsed.previewUrls) {
+      normalizedGalleryData.folders = normalizedGalleryData.folders.map(folder =>
+        folder.previewUrl !== undefined && folder.previewUrl !== null
+          ? folder
+          : {
+              ...folder,
+              previewUrl: parsed.previewUrls?.[folder.folder_path] ?? null,
+            },
+      );
+    }
+
+    return {
+      galleryData: normalizedGalleryData,
+      savedAt: parsed.savedAt,
+    };
   } catch {
     return null;
   }
@@ -50,16 +66,14 @@ export async function readGalleryCache(
 export async function writeGalleryCache(
   apiEnvironment: ApiEnvironment,
   galleryData: GalleryFoldersResponse,
-  previewUrls: Record<string, string | null>,
   userKey?: string,
 ) {
   const payload: GalleryCacheRecord = {
     galleryData,
-    previewUrls,
     savedAt: Date.now(),
   };
 
-  await AsyncStorage.setItem(
+  await setStoredString(
     getGalleryCacheKey(apiEnvironment, userKey),
     JSON.stringify(payload),
   );

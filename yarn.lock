@@ -5765,6 +5765,16 @@ react-native-is-edge-to-edge@1.2.1:
   resolved "https://registry.npmjs.org/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.2.1.tgz"
   integrity sha512-FLbPWl/MyYQWz+KwqOZsSyj2JmLKglHatd3xLZWskXOpRaio4LfEDEz8E/A6uD8QoTHW6Aobw1jbEwK7KMgR7Q==
 
+react-native-mmkv@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/react-native-mmkv/-/react-native-mmkv-4.3.0.tgz#dbb2817b75270194dd231b4290d3c834f7d6d417"
+  integrity sha512-D1wB2ViMrm+0rs7FcbLoct/BV+qugASi+XAZT8MzXy5yl0CI0qxToh2LPnw9UENHrNefpfDZgE5FpMhIB37I5Q==
+
+react-native-nitro-modules@0.35.0:
+  version "0.35.0"
+  resolved "https://registry.yarnpkg.com/react-native-nitro-modules/-/react-native-nitro-modules-0.35.0.tgz#e026055bceb1e5b43a54b131d0740b8e61412b2b"
+  integrity sha512-Eho1yEcLbsteGpBFn2XZOp5FIptnEciWzuYBW49S0jo41Un2LeyesIO/MqYLY/c5o7D9Fw9th4pxGtV7OAb0+g==
+
 react-native-paper@^5.14.5:
   version "5.15.0"
   resolved "https://registry.npmjs.org/react-native-paper/-/react-native-paper-5.15.0.tgz"

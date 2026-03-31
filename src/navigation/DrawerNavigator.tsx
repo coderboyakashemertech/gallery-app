@@ -29,7 +29,10 @@ import { LucideIcon } from '../components/LucideIcon';
 import { FoldersScreen } from '../screens/FoldersScreen';
 import { AlbumsScreen } from '../screens/AlbumsScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
-import { GalleryScreen } from '../screens/GalleryScreen';
+import {
+  GalleryFoldersScreen,
+  GalleryImagesScreen,
+} from '../screens/GalleryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import {
@@ -39,6 +42,7 @@ import {
 } from '../store/authApi';
 import { logout } from '../store/authSlice';
 import { useAppDispatch, useAppSelector } from '../store';
+import type { Folder as GalleryFolder } from '../types/folders';
 
 export type FoldersRouteParams = {
   path?: string;
@@ -59,7 +63,13 @@ export type FoldersStackParamList = {
   Folders: FoldersRouteParams;
 };
 
+export type GalleryStackParamList = {
+  GalleryFolders: undefined;
+  GalleryImages: { folder: GalleryFolder };
+};
+
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
+const GalleryStack = createNativeStackNavigator<GalleryStackParamList>();
 
 function HomeDrawerIcon({ color, size }: { color: string; size: number }) {
   return <LucideIcon icon={House} color={color} size={size} />;
@@ -87,6 +97,28 @@ function FoldersStackNavigator() {
     >
       <Stack.Screen name="Folders" component={FoldersScreen} />
     </Stack.Navigator>
+  );
+}
+
+function GalleryStackNavigator() {
+  const theme = useTheme();
+
+  return (
+    <GalleryStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
+      <GalleryStack.Screen
+        name="GalleryFolders"
+        component={GalleryFoldersScreen}
+      />
+      <GalleryStack.Screen
+        name="GalleryImages"
+        component={GalleryImagesScreen}
+      />
+    </GalleryStack.Navigator>
   );
 }
 
@@ -513,7 +545,7 @@ export function DrawerNavigator() {
       />
       <Drawer.Screen
         name="Gallery"
-        component={GalleryScreen}
+        component={GalleryStackNavigator}
         options={{
           headerShown: false,
           title: 'Gallery',

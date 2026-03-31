@@ -1,7 +1,7 @@
 import React from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  BackHandler,
   FlatList,
   Pressable,
   StyleSheet,
@@ -15,14 +15,16 @@ import FastImage from 'react-native-fast-image';
 import { LucideIcon } from '../components/LucideIcon';
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import { Screen } from '../components/Screen';
+import type { GalleryStackParamList } from '../navigation/DrawerNavigator';
 import { apiRequest } from '../services/api';
 import { useListDirectoryQuery } from '../store/authApi';
 import { useAppSelector } from '../store';
 import {
-  DirectoryContentsResponse,
   DirectoryFile,
   Folder as GalleryFolder,
   GalleryFoldersResponse,
+  RawGalleryFoldersResponse,
+  normalizeGalleryFoldersResponse,
 } from '../types/folders';
 import { readGalleryCache, writeGalleryCache } from '../utils/galleryCache';
 
@@ -100,6 +102,7 @@ function GalleryFolderCard({
     </Pressable>
   );
 }
+
 const MemoizedGalleryFolderCard = React.memo(GalleryFolderCard);
 
 function GalleryImageTile({
@@ -142,11 +145,88 @@ function GalleryImageTile({
     </Pressable>
   );
 }
+
 const MemoizedGalleryImageTile = React.memo(GalleryImageTile);
 
-export function GalleryScreen() {
+function GalleryTopBar({
+  title,
+  subtitle,
+  isRefreshing,
+  onRefresh,
+  onBack,
+}: {
+  title: string;
+  subtitle: string;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onBack?: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View style={styles.topBar}>
+      {onBack ? (
+        <Pressable
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.backButton,
+            {
+              backgroundColor: theme.colors.surfaceVariant,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <LucideIcon
+            icon={ArrowLeft}
+            color={theme.colors.onSurface}
+            size={18}
+          />
+        </Pressable>
+      ) : (
+        <View style={styles.headerSpacer} />
+      )}
+
+      <View style={styles.topBarCopy}>
+        <Text variant="titleSmall" numberOfLines={1}>
+          {title}
+        </Text>
+        <Text
+          variant="labelSmall"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {subtitle}
+        </Text>
+      </View>
+
+      <Pressable
+        onPress={onRefresh}
+        style={({ pressed }) => [
+          styles.refreshButton,
+          {
+            backgroundColor: theme.colors.surfaceVariant,
+            opacity: pressed ? 0.8 : 1,
+          },
+        ]}
+      >
+        {isRefreshing ? (
+          <ActivityIndicator size={16} />
+        ) : (
+          <LucideIcon
+            icon={RefreshCw}
+            color={theme.colors.onSurface}
+            size={16}
+          />
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+export function GalleryFoldersScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<GalleryStackParamList>>();
   const token = useAppSelector(state => state.auth.token);
   const username = useAppSelector(state => state.auth.user?.username);
   const apiEnvironment = useAppSelector(
@@ -157,45 +237,17 @@ export function GalleryScreen() {
   const [galleryError, setGalleryError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isFetching, setIsFetching] = React.useState(false);
-  const [selectedFolder, setSelectedFolder] =
-    React.useState<GalleryFolder | null>(null);
-  const [viewerVisible, setViewerVisible] = React.useState(false);
-  const [selectedIndex, setSelectedIndex] = React.useState(0);
-  const [folderPreviewUrls, setFolderPreviewUrls] = React.useState<
-    Record<string, string | null>
-  >({});
   const hasHydratedCacheRef = React.useRef(false);
   const hasGalleryDataRef = React.useRef(false);
 
-  const selectedFolderPath = selectedFolder?.folder_path ?? '';
-
-  const {
-    currentData: selectedFolderContents,
-    isLoading: isFolderLoading,
-    isFetching: isFolderFetching,
-    refetch: refetchFolder,
-  } = useListDirectoryQuery(
-    { path: selectedFolderPath },
-    { skip: !selectedFolderPath },
+  const folderGridColumns = 3;
+  const folderTileGap = 8;
+  const folderTileWidth = Math.floor(
+    (width - 32 - folderTileGap * (folderGridColumns - 1)) / folderGridColumns,
   );
-
   const folders = React.useMemo(
     () => galleryData?.folders ?? EMPTY_GALLERY_FOLDERS,
     [galleryData],
-  );
-  const folderFiles = selectedFolderContents?.files ?? EMPTY_FILES;
-  const viewerFiles = React.useMemo(
-    () =>
-      folderFiles.filter(file =>
-        file.extension
-          ? VIEWER_IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())
-          : false,
-      ),
-    [folderFiles],
-  );
-  const media = React.useMemo(
-    () => viewerFiles.map(item => ({ path: item.url, name: item.name })),
-    [viewerFiles],
   );
 
   React.useEffect(() => {
@@ -205,23 +257,13 @@ export function GalleryScreen() {
   React.useEffect(() => {
     hasHydratedCacheRef.current = false;
     setGalleryData(null);
-    setFolderPreviewUrls({});
     setGalleryError(null);
     setIsLoading(true);
-    setSelectedFolder(null);
   }, [apiEnvironment, username]);
 
   const persistGalleryCache = React.useCallback(
-    async (
-      nextGalleryData: GalleryFoldersResponse,
-      nextPreviewUrls: Record<string, string | null>,
-    ) => {
-      await writeGalleryCache(
-        apiEnvironment,
-        nextGalleryData,
-        nextPreviewUrls,
-        username,
-      );
+    async (nextGalleryData: GalleryFoldersResponse) => {
+      await writeGalleryCache(apiEnvironment, nextGalleryData, username);
     },
     [apiEnvironment, username],
   );
@@ -230,7 +272,6 @@ export function GalleryScreen() {
     async (options?: { forceRefresh?: boolean }) => {
       if (!token) {
         setGalleryData(null);
-        setFolderPreviewUrls({});
         setGalleryError(null);
         setIsLoading(false);
         return;
@@ -244,7 +285,6 @@ export function GalleryScreen() {
         if (cached) {
           hasHydratedCacheRef.current = true;
           setGalleryData(cached.galleryData);
-          setFolderPreviewUrls(cached.previewUrls);
           setGalleryError(null);
           setIsLoading(false);
           setIsFetching(false);
@@ -261,17 +301,16 @@ export function GalleryScreen() {
       }
 
       try {
-        const response = await apiRequest<GalleryFoldersResponse>(
+        const response = await apiRequest<RawGalleryFoldersResponse>(
           '/api/gallery/folders',
           { apiEnvironment, token },
         );
+        const normalizedGalleryData = normalizeGalleryFoldersResponse(
+          response.data,
+        );
 
-        setGalleryData(response.data);
-        setFolderPreviewUrls(current => {
-          const nextPreviews = forceRefresh ? {} : current;
-          persistGalleryCache(response.data, nextPreviews).catch(() => {});
-          return nextPreviews;
-        });
+        setGalleryData(normalizedGalleryData);
+        persistGalleryCache(normalizedGalleryData).catch(() => {});
       } catch (error) {
         const message =
           error instanceof Error
@@ -290,144 +329,129 @@ export function GalleryScreen() {
     fetchGalleryData().catch(() => {});
   }, [fetchGalleryData]);
 
-  React.useEffect(() => {
-    if (!selectedFolder) {
-      return;
-    }
+  return (
+    <Screen
+      style={[styles.screen, styles.darkScreen]}
+      scrollable={false}
+      noPadding
+    >
+      <GalleryTopBar
+        title="Gallery"
+        subtitle={`${folders.length} folder${folders.length === 1 ? '' : 's'}`}
+        isRefreshing={isFetching}
+        onRefresh={() => {
+          fetchGalleryData({ forceRefresh: true }).catch(() => {});
+        }}
+      />
 
-    const nextFolder = folders.find(
-      item => item.folder_path === selectedFolder.folder_path,
-    );
-
-    if (!nextFolder) {
-      setSelectedFolder(null);
-      return;
-    }
-
-    setSelectedFolder(nextFolder);
-  }, [folders, selectedFolder]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const foldersToPrefetch = folders.filter(
-      folder =>
-        folder.file_count > 0 &&
-        folderPreviewUrls[folder.folder_path] === undefined,
-    );
-
-    if (!foldersToPrefetch.length || !token || !galleryData) {
-      return;
-    }
-
-    const loadPreviews = async () => {
-      const previewEntries: Array<readonly [string, string | null]> = [];
-
-      for (const folder of foldersToPrefetch) {
-        try {
-          const result = await apiRequest<DirectoryContentsResponse>(
-            `/api/drives/list?path=${folder.folder_path}`,
-            {
-              apiEnvironment,
-              token,
-            },
-          );
-
-          const previewFile =
-            result.data.files.find(file => Boolean(file.url)) ??
-            result.data.files.find(file =>
-              file.extension
-                ? VIEWER_IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())
-                : false,
-            ) ??
-            null;
-
-          previewEntries.push([folder.folder_path, previewFile?.url ?? null]);
-        } catch {
-          previewEntries.push([folder.folder_path, null]);
+      <FlatList
+        data={folders}
+        key={`gallery-${folderGridColumns}`}
+        keyExtractor={item => item.folder_path}
+        numColumns={folderGridColumns}
+        initialNumToRender={12}
+        maxToRenderPerBatch={18}
+        windowSize={7}
+        removeClippedSubviews={false}
+        columnWrapperStyle={styles.folderColumns}
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              styles.folderColumnItem,
+              {
+                width: folderTileWidth,
+                marginRight:
+                  (index + 1) % folderGridColumns === 0 ? 0 : folderTileGap,
+                marginBottom: folderTileGap,
+              },
+            ]}
+          >
+            <MemoizedGalleryFolderCard
+              folder={item}
+              previewUrl={item.previewUrl}
+              onPress={() => navigation.navigate('GalleryImages', { folder: item })}
+            />
+          </View>
+        )}
+        contentContainerStyle={styles.folderContent}
+        ListEmptyComponent={
+          !isLoading && !isFetching ? (
+            <View style={styles.emptyState}>
+              <LucideIcon
+                icon={Folder}
+                color={theme.colors.onSurfaceVariant}
+                size={34}
+              />
+              <Text variant="titleMedium" style={styles.emptyTitle}>
+                {galleryError ? 'Gallery failed to load' : 'No gallery folders yet'}
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {galleryError ?? 'Your gallery API did not return any folders.'}
+              </Text>
+            </View>
+          ) : null
         }
-
-        if (cancelled) {
-          return;
+        ListFooterComponent={
+          isLoading || isFetching ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator />
+            </View>
+          ) : null
         }
-      }
-
-      if (cancelled || !previewEntries.length) {
-        return;
-      }
-
-      let mergedPreviewUrls: Record<string, string | null> | null = null;
-
-      setFolderPreviewUrls(current => {
-        mergedPreviewUrls = { ...current };
-
-        previewEntries.forEach(([path, url]) => {
-          mergedPreviewUrls![path] = url;
-        });
-
-        return mergedPreviewUrls!;
-      });
-
-      if (mergedPreviewUrls) {
-        await persistGalleryCache(galleryData, mergedPreviewUrls);
-      }
-    };
-
-    loadPreviews().catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    apiEnvironment,
-    folderPreviewUrls,
-    folders,
-    galleryData,
-    persistGalleryCache,
-    token,
-  ]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      const onBackPress = () => {
-        if (!selectedFolder) {
-          return false;
-        }
-
-        setSelectedFolder(null);
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        'hardwareBackPress',
-        onBackPress,
-      );
-
-      return () => {
-        subscription.remove();
-      };
-    }, [selectedFolder]),
+      />
+    </Screen>
   );
+}
 
-  const folderGridColumns = 3;
-  const folderTileGap = 8;
-  const imageGridColumns = width >= 900 ? 4 : 3;
+export function GalleryImagesScreen() {
+  const theme = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<GalleryStackParamList>>();
+  const route = useRoute<RouteProp<GalleryStackParamList, 'GalleryImages'>>();
+  const { width } = useWindowDimensions();
+  const folder = route.params.folder;
+  const [viewerVisible, setViewerVisible] = React.useState(false);
+  const [selectedIndex, setSelectedIndex] = React.useState(0);
+
+  const imageGridColumns = 4;
   const tileGap = 2;
-  const folderTileWidth = Math.floor(
-    (width - 32 - folderTileGap * (folderGridColumns - 1)) / folderGridColumns,
-  );
   const tileWidth = Math.floor(
     (width - tileGap * (imageGridColumns - 1)) / imageGridColumns,
   );
 
-  const handleRefresh = () => {
-    if (selectedFolder) {
-      refetchFolder();
-      return;
+  const {
+    currentData: selectedFolderContents,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useListDirectoryQuery({ path: folder.folder_path });
+
+  const folderFiles = selectedFolderContents?.files ?? EMPTY_FILES;
+  const imageRows = React.useMemo(() => {
+    const rows: DirectoryFile[][] = [];
+
+    for (let index = 0; index < folderFiles.length; index += imageGridColumns) {
+      rows.push(folderFiles.slice(index, index + imageGridColumns));
     }
 
-    fetchGalleryData({ forceRefresh: true }).catch(() => {});
-  };
+    return rows;
+  }, [folderFiles, imageGridColumns]);
+  const viewerFiles = React.useMemo(
+    () =>
+      folderFiles.filter(file =>
+        file.extension
+          ? VIEWER_IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())
+          : false,
+      ),
+    [folderFiles],
+  );
+  const media = React.useMemo(
+    () => viewerFiles.map(item => ({ path: item.url, name: item.name })),
+    [viewerFiles],
+  );
 
   return (
     <Screen
@@ -435,186 +459,84 @@ export function GalleryScreen() {
       scrollable={false}
       noPadding
     >
-      <View style={styles.topBar}>
-        {selectedFolder ? (
-          <Pressable
-            onPress={() => setSelectedFolder(null)}
-            style={({ pressed }) => [
-              styles.backButton,
-              {
-                backgroundColor: theme.colors.surfaceVariant,
-                opacity: pressed ? 0.8 : 1,
-              },
-            ]}
-          >
-            <LucideIcon
-              icon={ArrowLeft}
-              color={theme.colors.onSurface}
-              size={18}
-            />
-          </Pressable>
-        ) : (
-          <View />
-        )}
+      <GalleryTopBar
+        title={folder.folder_name}
+        subtitle={`${folderFiles.length} item${folderFiles.length === 1 ? '' : 's'}`}
+        isRefreshing={isFetching}
+        onRefresh={() => {
+          refetch();
+        }}
+        onBack={() => navigation.goBack()}
+      />
 
-        <View style={styles.topBarCopy}>
-          <Text variant="titleSmall" numberOfLines={1}>
-            {selectedFolder ? selectedFolder.folder_name : 'Gallery'}
-          </Text>
-          <Text
-            variant="labelSmall"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {selectedFolder
-              ? `${folderFiles.length} item${
-                  folderFiles.length === 1 ? '' : 's'
-                }`
-              : `${folders.length} folder${folders.length === 1 ? '' : 's'}`}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={handleRefresh}
-          style={({ pressed }) => [
-            styles.refreshButton,
-            {
-              backgroundColor: theme.colors.surfaceVariant,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          {isFetching || isFolderFetching ? (
-            <ActivityIndicator size={16} />
-          ) : (
-            <LucideIcon
-              icon={RefreshCw}
-              color={theme.colors.onSurface}
-              size={16}
-            />
-          )}
-        </Pressable>
-      </View>
-
-      {selectedFolder ? (
-        <FlatList
-          data={folderFiles}
-          key={`gallery-folder-${imageGridColumns}`}
-          numColumns={imageGridColumns}
-          keyExtractor={item => item.path}
-          initialNumToRender={18}
-          maxToRenderPerBatch={24}
-          windowSize={9}
-          removeClippedSubviews={false}
-          renderItem={({ item, index }) => {
-            const mediaIndex = viewerFiles.findIndex(
-              file => file.path === item.path,
-            );
-
-            return (
-              <View
-                style={{
-                  width: tileWidth,
-                  marginRight:
-                    (index + 1) % imageGridColumns === 0 ? 0 : tileGap,
-                  marginBottom: tileGap,
-                }}
-              >
-                <MemoizedGalleryImageTile
-                  item={item}
-                  onPress={() => {
-                    if (mediaIndex < 0) {
-                      return;
-                    }
-
-                    setSelectedIndex(mediaIndex);
-                    setViewerVisible(true);
-                  }}
-                />
-              </View>
-            );
-          }}
-          contentContainerStyle={styles.imagesContent}
-          ListEmptyComponent={
-            !isFolderLoading && !isFolderFetching ? (
-              <View style={styles.emptyState}>
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  No files found in this gallery folder.
-                </Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            isFolderLoading || isFolderFetching ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator />
-              </View>
-            ) : null
-          }
-        />
-      ) : (
-        <FlatList
-          data={folders}
-          key={`gallery-${folderGridColumns}`}
-          keyExtractor={item => item.folder_path}
-          numColumns={folderGridColumns}
-          initialNumToRender={12}
-          maxToRenderPerBatch={18}
-          windowSize={7}
-          removeClippedSubviews={false}
-          columnWrapperStyle={styles.folderColumns}
-          renderItem={({ item, index }) => (
+      <FlatList
+        data={imageRows}
+        key={`gallery-folder-${folder.folder_path}-${imageGridColumns}`}
+        keyExtractor={(row, index) => row[0]?.path ?? `gallery-row-${index}`}
+        initialNumToRender={18}
+        maxToRenderPerBatch={24}
+        windowSize={9}
+        removeClippedSubviews={false}
+        renderItem={({ item: row }) => {
+          return (
             <View
               style={[
-                styles.folderColumnItem,
-                {
-                  width: folderTileWidth,
-                  marginRight:
-                    (index + 1) % folderGridColumns === 0 ? 0 : folderTileGap,
-                  marginBottom: folderTileGap,
-                },
+                styles.imageRow,
+                row.length < imageGridColumns ? styles.imageRowCentered : null,
               ]}
             >
-              <MemoizedGalleryFolderCard
-                folder={item}
-                previewUrl={folderPreviewUrls[item.folder_path]}
-                onPress={() => setSelectedFolder(item)}
-              />
+              {row.map((file, index) => {
+                const mediaIndex = viewerFiles.findIndex(
+                  item => item.path === file.path,
+                );
+
+                return (
+                  <View
+                    key={file.path}
+                    style={{
+                      width: tileWidth,
+                      marginRight: index === row.length - 1 ? 0 : tileGap,
+                      marginBottom: tileGap,
+                    }}
+                  >
+                    <MemoizedGalleryImageTile
+                      item={file}
+                      onPress={() => {
+                        if (mediaIndex < 0) {
+                          return;
+                        }
+
+                        setSelectedIndex(mediaIndex);
+                        setViewerVisible(true);
+                      }}
+                    />
+                  </View>
+                );
+              })}
             </View>
-          )}
-          contentContainerStyle={styles.folderContent}
-          ListEmptyComponent={
-            !isLoading && !isFetching ? (
-              <View style={styles.emptyState}>
-                <LucideIcon
-                  icon={Folder}
-                  color={theme.colors.onSurfaceVariant}
-                  size={34}
-                />
-                <Text variant="titleMedium" style={styles.emptyTitle}>
-                  {galleryError ? 'Gallery failed to load' : 'No gallery folders yet'}
-                </Text>
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {galleryError ??
-                    'Your gallery API did not return any folders.'}
-                </Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            isLoading || isFetching ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator />
-              </View>
-            ) : null
-          }
-        />
-      )}
+          );
+        }}
+        contentContainerStyle={styles.imagesContent}
+        ListEmptyComponent={
+          !isLoading && !isFetching ? (
+            <View style={styles.emptyState}>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                No files found in this gallery folder.
+              </Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          isLoading || isFetching ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator />
+            </View>
+          ) : null
+        }
+      />
 
       <MediaViewerModal
         visible={viewerVisible}
@@ -648,6 +570,11 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 5,
+  },
+  headerSpacer: {
+    width: 38,
+    height: 38,
     marginRight: 5,
   },
   topBarCopy: {
@@ -707,6 +634,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingBottom: 0,
     paddingTop: 0,
+  },
+  imageRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  imageRowCentered: {
+    justifyContent: 'center',
   },
   tilePressable: {
     width: '100%',
