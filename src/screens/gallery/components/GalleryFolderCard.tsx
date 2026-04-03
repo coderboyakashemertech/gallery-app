@@ -1,10 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import FastImage from 'react-native-fast-image';
-import { Folder } from 'lucide-react-native';
 import { Text, useTheme } from 'react-native-paper';
 
-import { LucideIcon } from '../../../components/LucideIcon';
+import { ImagePlaceholder } from './ImagePlaceholder';
 import type { Folder as GalleryFolder } from '../../../types/folders';
 
 export function GalleryFolderCard({
@@ -39,7 +38,6 @@ export function GalleryFolderCard({
     return apiBaseUrl ? `${apiBaseUrl}${separator}${previewUrl}` : previewUrl;
   }, [previewUrl, apiBaseUrl]);
 
-  console.log(fullUrl)
 
   return (
     <Pressable
@@ -68,11 +66,9 @@ export function GalleryFolderCard({
             onError={() => setPreviewFailed(true)}
           />
         ) : (
-          <LucideIcon
-            icon={Folder}
-            color={theme.colors.onSurfaceVariant}
-            size={30}
-          />
+          <View style={styles.folderPlaceholder}>
+            <ImagePlaceholder size={56} />
+          </View>
         )}
       </View>
       <View style={styles.folderCopy}>
@@ -129,5 +125,12 @@ const styles = StyleSheet.create({
   folderMeta: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  folderPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
   },
 });

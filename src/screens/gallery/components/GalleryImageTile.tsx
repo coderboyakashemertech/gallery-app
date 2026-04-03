@@ -1,10 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import FastImage from 'react-native-fast-image';
-import { ImageIcon } from 'lucide-react-native';
 import { useTheme } from 'react-native-paper';
 
-import { LucideIcon } from '../../../components/LucideIcon';
+import { ImagePlaceholder } from './ImagePlaceholder';
 import type { DirectoryFile } from '../../../types/folders';
 
 export const VIEWER_IMAGE_EXTENSIONS = [
@@ -42,7 +41,6 @@ export function GalleryImageTile({
     return apiBaseUrl ? `${apiBaseUrl}${item.url}` : item.url;
   }, [item.url, apiBaseUrl]);
 
-  console.log(fullUrl)
 
   return (
     <Pressable onPress={onPress} style={styles.tilePressable}>
@@ -63,11 +61,7 @@ export function GalleryImageTile({
             { backgroundColor: theme.colors.surfaceVariant },
           ]}
         >
-          <LucideIcon
-            icon={ImageIcon}
-            color={theme.colors.onSurfaceVariant}
-            size={26}
-          />
+          <ImagePlaceholder size={44} />
         </View>
       )}
     </Pressable>

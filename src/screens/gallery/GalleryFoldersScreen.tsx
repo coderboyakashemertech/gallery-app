@@ -46,8 +46,8 @@ export function GalleryFoldersScreen() {
   const hasHydratedCacheRef = React.useRef(false);
   const hasGalleryDataRef = React.useRef(false);
 
-  const folderGridColumns = 2;
-  const folderTileGap = 16;
+  const folderGridColumns = 3;
+  const folderTileGap = 12;
   const folderTileWidth = Math.floor(
     (width - 32 - folderTileGap * (folderGridColumns - 1)) / folderGridColumns,
   );
