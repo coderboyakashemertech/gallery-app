@@ -32,7 +32,7 @@ import { FavoritesScreen } from '../screens/FavoritesScreen';
 import {
   GalleryFoldersScreen,
   GalleryImagesScreen,
-} from '../screens/GalleryScreen';
+} from '../screens/gallery';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import {
