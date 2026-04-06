@@ -2,6 +2,7 @@ import React from 'react';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
 
 import { MediaViewerModal } from '../../components/MediaViewerModal';
@@ -20,8 +21,23 @@ import { GalleryTopBar } from './components/GalleryTopBar';
 
 const EMPTY_FILES: DirectoryFile[] = [];
 
+const IMAGE_ONLY_EXTENSIONS = new Set([
+  // Common raster
+  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif',
+  // Modern / HDR
+  '.heic', '.heif', '.avif', '.jxl',
+  // Raw camera formats
+  '.raw', '.cr2', '.cr3', '.nef', '.nrw', '.arw', '.srf', '.sr2',
+  '.orf', '.rw2', '.dng', '.pef', '.raf', '.erf', '.mrw', '.3fr',
+  '.mef', '.mos', '.rwl', '.srw',
+  // Other raster
+  '.ico', '.svg', '.svgz', '.xbm', '.xpm', '.psd', '.xcf',
+  '.wbmp', '.pnm', '.pbm', '.pgm', '.ppm',
+]);
+
 export function GalleryImagesScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<GalleryStackParamList>>();
   const route = useRoute<RouteProp<GalleryStackParamList, 'GalleryImages'>>();
@@ -51,7 +67,16 @@ export function GalleryImagesScreen() {
     refetch,
   } = useListDirectoryQuery({ path: folder.folder_path });
 
-  const folderFiles = selectedFolderContents?.files ?? EMPTY_FILES;
+  const folderFiles = React.useMemo(
+    () =>
+      (selectedFolderContents?.files ?? EMPTY_FILES).filter(
+        file =>
+          file.extension &&
+          IMAGE_ONLY_EXTENSIONS.has(file.extension.toLowerCase()),
+      ),
+    [selectedFolderContents],
+  );
+
   const imageRows = React.useMemo(() => {
     const rows: DirectoryFile[][] = [];
 
@@ -80,6 +105,7 @@ export function GalleryImagesScreen() {
       style={[styles.screen, { backgroundColor: theme.colors.background }]}
       scrollable={false}
       noPadding
+      edges={['bottom', 'left', 'right']}
     >
       <GalleryTopBar
         title={folder.folder_name}
@@ -140,7 +166,7 @@ export function GalleryImagesScreen() {
             </View>
           );
         }}
-        contentContainerStyle={styles.imagesContent}
+        contentContainerStyle={[styles.imagesContent, { paddingBottom: insets.bottom + 48 }]}
         ListEmptyComponent={
           !isLoading && !isFetching ? (
             <View style={styles.emptyState}>

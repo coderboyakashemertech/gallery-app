@@ -1,7 +1,8 @@
 import React from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Folder } from 'lucide-react-native';
 import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
 
@@ -26,6 +27,7 @@ const EMPTY_GALLERY_FOLDERS: GalleryFolder[] = [];
 
 export function GalleryFoldersScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const navigation =
     useNavigation<NativeStackNavigationProp<GalleryStackParamList>>();
@@ -116,7 +118,7 @@ export function GalleryFoldersScreen() {
         );
 
         setGalleryData(normalizedGalleryData);
-        persistGalleryCache(normalizedGalleryData).catch(() => {});
+        persistGalleryCache(normalizedGalleryData).catch(() => { });
       } catch (error) {
         const message =
           error instanceof Error
@@ -132,7 +134,7 @@ export function GalleryFoldersScreen() {
   );
 
   React.useEffect(() => {
-    fetchGalleryData().catch(() => {});
+    fetchGalleryData().catch(() => { });
   }, [fetchGalleryData]);
 
   return (
@@ -140,14 +142,16 @@ export function GalleryFoldersScreen() {
       style={[styles.screen, { backgroundColor: theme.colors.background }]}
       scrollable={false}
       noPadding
+      edges={['bottom', 'left', 'right']}
     >
       <GalleryTopBar
         title="Gallery"
         subtitle={`${folders.length} folder${folders.length === 1 ? '' : 's'}`}
         isRefreshing={isFetching}
         onRefresh={() => {
-          fetchGalleryData({ forceRefresh: true }).catch(() => {});
+          fetchGalleryData({ forceRefresh: true }).catch(() => { });
         }}
+        onMenu={() => navigation.dispatch(DrawerActions.toggleDrawer())}
       />
 
       <FlatList
@@ -181,7 +185,7 @@ export function GalleryFoldersScreen() {
             />
           </View>
         )}
-        contentContainerStyle={styles.folderContent}
+        contentContainerStyle={[styles.folderContent, { paddingBottom: insets.bottom + 48 }]}
         ListEmptyComponent={
           !isLoading && !isFetching ? (
             <View style={styles.emptyState}>

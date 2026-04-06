@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { ArrowLeft, Menu, RefreshCw } from 'lucide-react-native';
 import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LucideIcon } from '../../../components/LucideIcon';
 
@@ -11,17 +12,28 @@ export function GalleryTopBar({
   isRefreshing,
   onRefresh,
   onBack,
+  onMenu,
 }: {
   title: string;
   subtitle: string;
   isRefreshing: boolean;
   onRefresh: () => void;
   onBack?: () => void;
+  onMenu?: () => void;
 }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.topBar}>
+    <View
+      style={[
+        styles.topBar,
+        {
+          paddingTop: insets.top + 12,
+          backgroundColor: theme.colors.background,
+        },
+      ]}
+    >
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -38,6 +50,19 @@ export function GalleryTopBar({
             color={theme.colors.onSurface}
             size={18}
           />
+        </Pressable>
+      ) : onMenu ? (
+        <Pressable
+          accessibilityLabel="Open navigation menu"
+          accessibilityRole="button"
+          onPress={onMenu}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.menuButton,
+            { opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
+          <LucideIcon icon={Menu} color={theme.colors.onSurface} size={24} />
         </Pressable>
       ) : (
         <View style={styles.headerSpacer} />
@@ -80,13 +105,19 @@ export function GalleryTopBar({
 }
 
 const styles = StyleSheet.create({
+  menuButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 5,
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
     gap: 10,
   },
   backButton: {

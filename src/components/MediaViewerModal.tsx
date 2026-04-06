@@ -359,7 +359,7 @@ function ViewerHeader({
           </Pressable>
           <Pressable
             onPress={onOpenMenu}
-            style={styles.menuButton}
+            style={styles.menuButtonSpaced}
             hitSlop={10}
           >
             <LucideIcon icon={MoreVertical} color="#fff" size={22} />
@@ -624,9 +624,8 @@ export function MediaViewerModal({
     setCopyingImage(true);
 
     const sanitizedName = sanitizeFileName(currentMedia.name || 'file');
-    const tempPath = `${
-      ReactNativeBlobUtil.fs.dirs.CacheDir
-    }/${Date.now()}_${sanitizedName}`;
+    const tempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir
+      }/${Date.now()}_${sanitizedName}`;
 
     try {
       const response = await ReactNativeBlobUtil.config({
@@ -651,9 +650,8 @@ export function MediaViewerModal({
     setMenuVisible(false);
     setOpeningExternally(true);
 
-    const tempPath = `${
-      ReactNativeBlobUtil.fs.dirs.CacheDir
-    }/${sanitizeFileName(currentMedia.name || 'file')}`;
+    const tempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir
+      }/${sanitizeFileName(currentMedia.name || 'file')}`;
 
     try {
       const response = await ReactNativeBlobUtil.config({
@@ -687,9 +685,8 @@ export function MediaViewerModal({
     setSharingItem(true);
 
     const sanitizedName = sanitizeFileName(currentMedia.name || 'file');
-    const tempPath = `${
-      ReactNativeBlobUtil.fs.dirs.CacheDir
-    }/${Date.now()}_${sanitizedName}`;
+    const tempPath = `${ReactNativeBlobUtil.fs.dirs.CacheDir
+      }/${Date.now()}_${sanitizedName}`;
 
     try {
       const response = await ReactNativeBlobUtil.config({
@@ -707,7 +704,7 @@ export function MediaViewerModal({
       });
 
       setTimeout(() => {
-        ReactNativeBlobUtil.fs.unlink(localFilePath).catch(() => {});
+        ReactNativeBlobUtil.fs.unlink(localFilePath).catch(() => { });
       }, 5000);
     } catch (error: any) {
       if (error?.message !== 'User did not share') {
@@ -984,6 +981,10 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 8,
+  },
+  menuButtonSpaced: {
+    padding: 8,
+    marginLeft: 8,
   },
   menuWrap: {
     position: 'relative',

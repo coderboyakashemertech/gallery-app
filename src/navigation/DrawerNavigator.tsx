@@ -8,10 +8,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   ChevronDown,
   ChevronUp,
-  CircleHelp,
   Folder,
   HardDrive,
-  House,
   Image as ImageIcon,
   LogOut,
   Menu,
@@ -33,7 +31,6 @@ import {
   GalleryFoldersScreen,
   GalleryImagesScreen,
 } from '../screens/gallery';
-import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import {
   authApi,
@@ -51,7 +48,6 @@ export type FoldersRouteParams = {
 };
 
 export type RootDrawerParamList = {
-  Home: undefined;
   Favorites: undefined;
   Albums: undefined;
   Gallery: undefined;
@@ -70,10 +66,6 @@ export type GalleryStackParamList = {
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const GalleryStack = createNativeStackNavigator<GalleryStackParamList>();
-
-function HomeDrawerIcon({ color, size }: { color: string; size: number }) {
-  return <LucideIcon icon={House} color={color} size={size} />;
-}
 
 function FoldersDrawerIcon({ color, size }: { color: string; size: number }) {
   return <LucideIcon icon={Folder} color={color} size={size} />;
@@ -177,7 +169,6 @@ type DrawerListItemProps = {
   label: string;
   icon: React.ComponentProps<typeof LucideIcon>['icon'];
   onPress?: () => void;
-  subtitle?: string;
   focused?: boolean;
   compact?: boolean;
   trailing?: React.ReactNode;
@@ -187,7 +178,6 @@ function DrawerListItem({
   label,
   icon,
   onPress,
-  subtitle,
   focused = false,
   compact = false,
   trailing,
@@ -206,31 +196,28 @@ function DrawerListItem({
         pressed && onPress ? { opacity: 0.72 } : null,
       ]}
     >
-      <LucideIcon
-        icon={icon}
-        color={focused ? theme.colors.onSurface : theme.colors.onSurfaceVariant}
-        size={compact ? 19 : 22}
-      />
-      <View style={styles.drawerRowCopy}>
-        <Text
-          variant={compact ? 'bodyMedium' : 'titleMedium'}
-          style={[
-            styles.drawerRowLabel,
-            compact && styles.drawerRowLabelCompact,
-            {
-              color: focused ? theme.colors.onSurface : theme.colors.onSurface,
-            },
-          ]}
-        >
-          {label}
-        </Text>
-        {subtitle ? (
-          <Text variant="bodySmall" style={styles.drawerRowSubtitle}>
-            {subtitle}
+      <View style={styles.drawerRowTop}>
+        <LucideIcon
+          icon={icon}
+          color={focused ? theme.colors.onSurface : theme.colors.onSurfaceVariant}
+          size={compact ? 19 : 22}
+        />
+        <View style={styles.drawerRowCopy}>
+          <Text
+            variant={compact ? 'bodyMedium' : 'titleMedium'}
+            style={[
+              styles.drawerRowLabel,
+              compact && styles.drawerRowLabelCompact,
+              {
+                color: focused ? theme.colors.onSurface : theme.colors.onSurface,
+              },
+            ]}
+          >
+            {label}
           </Text>
-        ) : null}
+        </View>
+        {trailing}
       </View>
-      {trailing}
     </Pressable>
   );
 }
@@ -287,12 +274,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         drivePath.endsWith('/') ? drivePath : `${drivePath}/`,
       ));
 
-  const cleanupSubtitle =
-    pinnedFolders.length > 0
-      ? `${pinnedFolders.length} pinned folders`
-      : 'Quick access';
-  const trashSubtitle = recycleBin ? 'Recently deleted items' : 'Bin is empty';
-
   return (
     <DrawerContentScrollView
       {...props}
@@ -310,7 +291,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
                   variant="headlineSmall"
                   style={[styles.brandTitle, { color: theme.colors.onSurface }]}
                 >
-                  Files
+                  Gallery
                 </Text>
                 <Text
                   variant="bodyMedium"
@@ -327,36 +308,26 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
           <View style={styles.primarySection}>
             <DrawerListItem
-              label="Files"
-              icon={House}
-              focused={activeRoute === 'Home'}
-              onPress={() => props.navigation.navigate('Home')}
+              label="Gallery"
+              icon={ImageIcon}
+              focused={activeRoute === 'Gallery'}
+              onPress={() => props.navigation.navigate('Gallery')}
             />
             <DrawerListItem
               label="Favourites"
               icon={Sparkles}
-              subtitle={cleanupSubtitle}
               focused={activeRoute === 'Favorites'}
               onPress={() => props.navigation.navigate('Favorites')}
             />
             <DrawerListItem
               label="Albums"
               icon={Folder}
-              subtitle="Create your own collections"
               focused={activeRoute === 'Albums'}
               onPress={() => props.navigation.navigate('Albums')}
             />
             <DrawerListItem
-              label="Gallery"
-              icon={ImageIcon}
-              subtitle="Browse folders from the gallery API"
-              focused={activeRoute === 'Gallery'}
-              onPress={() => props.navigation.navigate('Gallery')}
-            />
-            <DrawerListItem
               label="Trash"
               icon={Trash2}
-              subtitle={trashSubtitle}
               focused={
                 activeRoute === 'FoldersStack' &&
                 !!recycleBin &&
@@ -478,7 +449,7 @@ export function DrawerNavigator() {
 
   return (
     <Drawer.Navigator
-      initialRouteName="Home"
+      initialRouteName="Gallery"
       drawerContent={CustomDrawerContent}
       screenOptions={({ navigation }) => ({
         headerShown: false,
@@ -509,16 +480,6 @@ export function DrawerNavigator() {
         },
       })}
     >
-      <Drawer.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          headerShown: true,
-          title: 'Home',
-          drawerLabel: 'Home',
-          drawerIcon: HomeDrawerIcon,
-        }}
-      />
       <Drawer.Screen
         name="Favorites"
         component={FavoritesScreen}
@@ -635,13 +596,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   drawerRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: 18,
     borderRadius: 16,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 4,
+  },
+  drawerRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    width: '100%',
   },
   drawerRowCompact: {
     paddingVertical: 10,
@@ -657,10 +623,6 @@ const styles = StyleSheet.create({
   },
   drawerRowLabelCompact: {
     lineHeight: 22,
-  },
-  drawerRowSubtitle: {
-    color: '#aeb4bf',
-    marginTop: 1,
   },
   sectionDivider: {
     backgroundColor: '#343944',
