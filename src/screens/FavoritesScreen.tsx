@@ -1,112 +1,150 @@
 import React from 'react';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import {
   FlatList,
-  Pressable,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { ImageIcon } from 'lucide-react-native';
-import { Text } from 'react-native-paper';
-import FastImage from 'react-native-fast-image';
-
-import { LucideIcon } from '../components/LucideIcon';
+import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import { Screen } from '../components/Screen';
+import { getApiBaseUrl, resolveApiEnvironment } from '../config/api';
+import { useAppSelector } from '../store';
 import { useGetFavoriteImagesQuery } from '../store/authApi';
 import { DirectoryFile } from '../types/folders';
 
+import { MemoizedGalleryImageTile } from './gallery/components/GalleryImageTile';
+import { GalleryTopBar } from './gallery/components/GalleryTopBar';
+
 const EMPTY_FAVORITE_IMAGES: DirectoryFile[] = [];
 
-function FavoriteTile({
-  item,
-  onPress,
-}: {
-  item: DirectoryFile;
-  onPress: () => void;
-}) {
-  const [previewFailed, setPreviewFailed] = React.useState(false);
-
-  return (
-    <Pressable onPress={onPress} style={styles.tilePressable}>
-      {previewFailed ? (
-        <View style={styles.tileFallback}>
-          <LucideIcon icon={ImageIcon} color="#9aa0a6" size={28} />
-        </View>
-      ) : (
-        <FastImage
-          source={{ uri: item.url }}
-          style={styles.tileImage}
-          resizeMode={FastImage.resizeMode.cover}
-          onError={() => {
-            console.error('[FavoritesScreen:image] preview failed', {
-              name: item.name,
-              path: item.path,
-              url: item.url,
-              extension: item.extension,
-            });
-            setPreviewFailed(true);
-          }}
-        />
-      )}
-    </Pressable>
-  );
-}
-
 export function FavoritesScreen() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const { data, isLoading, isFetching } = useGetFavoriteImagesQuery();
+  const { data, isLoading, isFetching, refetch } = useGetFavoriteImagesQuery();
+  const token = useAppSelector(state => state.auth.token);
+  const apiEnvironment = useAppSelector(
+    state => state.preferences.apiEnvironment,
+  );
+  const apiBaseUrl = React.useMemo(
+    () => getApiBaseUrl(resolveApiEnvironment(apiEnvironment)),
+    [apiEnvironment],
+  );
+
   const [viewerVisible, setViewerVisible] = React.useState(false);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
 
   const favoriteImages = data ?? EMPTY_FAVORITE_IMAGES;
+
+  const imageGridColumns = 3;
+  const tileGap = 1;
+  const tileWidth = Math.floor(
+    (width - tileGap * (imageGridColumns - 1)) / imageGridColumns,
+  );
+
+  const imageRows = React.useMemo(() => {
+    const rows: DirectoryFile[][] = [];
+    for (let index = 0; index < favoriteImages.length; index += imageGridColumns) {
+      rows.push(favoriteImages.slice(index, index + imageGridColumns));
+    }
+    return rows;
+  }, [favoriteImages, imageGridColumns]);
+
   const media = React.useMemo(
     () => favoriteImages.map(item => ({ path: item.url, name: item.name })),
     [favoriteImages],
   );
 
-  const numColumns = width >= 900 ? 4 : 3;
-  const tileGap = 2;
-  const tileWidth = Math.floor(
-    (width - tileGap * (numColumns - 1)) / numColumns,
-  );
-
   return (
     <Screen
-      style={[styles.screen, { backgroundColor: '#202124' }]}
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
       scrollable={false}
       noPadding
+      edges={['bottom', 'left', 'right']}
     >
+      <GalleryTopBar
+        title="Favourites"
+        subtitle={`${favoriteImages.length} item${favoriteImages.length === 1 ? '' : 's'}`}
+        isRefreshing={isFetching}
+        onRefresh={() => {
+          refetch();
+        }}
+        onMenu={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+      />
+
       <FlatList
-        data={favoriteImages}
-        key={`${numColumns}`}
-        keyExtractor={item => item.path}
-        numColumns={numColumns}
-        renderItem={({ item, index }) => (
-          <View
-            style={{
-              width: tileWidth,
-              marginRight: (index + 1) % numColumns === 0 ? 0 : tileGap,
-              marginBottom: tileGap,
-            }}
-          >
-            <FavoriteTile
-              item={item}
-              onPress={() => {
-                setSelectedIndex(index);
-                setViewerVisible(true);
-              }}
-            />
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
+        data={imageRows}
+        key={`favorites-gallery-${imageGridColumns}`}
+        keyExtractor={(row, index) => row[0]?.path ?? `favorites-row-${index}`}
+        initialNumToRender={18}
+        maxToRenderPerBatch={24}
+        windowSize={9}
+        removeClippedSubviews={false}
+        renderItem={({ item: row }) => {
+          return (
+            <View
+              style={[
+                styles.imageRow,
+                row.length < imageGridColumns ? styles.imageRowCentered : null,
+              ]}
+            >
+              {row.map((file, index) => {
+                const mediaIndex = favoriteImages.findIndex(
+                  item => item.path === file.path,
+                );
+
+                return (
+                  <View
+                    key={file.path}
+                    style={{
+                      width: tileWidth,
+                      marginRight: index === row.length - 1 ? 0 : tileGap,
+                      marginBottom: tileGap,
+                    }}
+                  >
+                    <MemoizedGalleryImageTile
+                      item={file}
+                      token={token}
+                      apiBaseUrl={apiBaseUrl}
+                      onPress={() => {
+                        if (mediaIndex < 0) {
+                          return;
+                        }
+                        setSelectedIndex(mediaIndex);
+                        setViewerVisible(true);
+                      }}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          );
+        }}
+        contentContainerStyle={[
+          styles.imagesContent,
+          { paddingBottom: insets.bottom + 48 },
+        ]}
         ListEmptyComponent={
           !isLoading && !isFetching ? (
             <View style={styles.emptyState}>
-              <Text variant="bodyMedium" style={{ color: '#d1d5db' }}>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 No favourite images yet.
               </Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          isLoading || isFetching ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator />
             </View>
           ) : null
         }
@@ -126,27 +164,27 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  listContent: {
-    paddingTop: 2,
-    paddingBottom: 12,
+  imagesContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    paddingTop: 0,
   },
-  tilePressable: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#2b2c2f',
-    overflow: 'hidden',
+  imageRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
-  tileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  tileFallback: {
-    flex: 1,
-    alignItems: 'center',
+  imageRowCentered: {
     justifyContent: 'center',
   },
   emptyState: {
-    paddingTop: 48,
+    paddingTop: 56,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  loadingWrap: {
+    paddingVertical: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

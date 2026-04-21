@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   BackHandler,
   FlatList,
@@ -8,7 +8,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, Folder, ImageIcon, Plus, RefreshCw } from 'lucide-react-native';
+import { Folder, ImageIcon, Plus } from 'lucide-react-native';
 import FastImage from 'react-native-fast-image';
 import {
   ActivityIndicator,
@@ -18,10 +18,13 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LucideIcon } from '../components/LucideIcon';
 import { MediaViewerModal } from '../components/MediaViewerModal';
 import { Screen } from '../components/Screen';
+import { getApiBaseUrl, resolveApiEnvironment } from '../config/api';
+import { useAppSelector } from '../store';
 import {
   AlbumSummary,
   useCreateAlbumMutation,
@@ -30,6 +33,9 @@ import {
 } from '../store/authApi';
 import { DirectoryFile } from '../types/folders';
 import { showToast } from '../utils/toast';
+
+import { GalleryTopBar } from './gallery/components/GalleryTopBar';
+import { MemoizedGalleryImageTile } from './gallery/components/GalleryImageTile';
 
 const EMPTY_ALBUM_IMAGES: DirectoryFile[] = [];
 
@@ -82,59 +88,28 @@ function AlbumCard({
         )}
       </View>
       <View style={styles.albumCopy}>
-        <Text variant="titleMedium" numberOfLines={1} style={styles.albumTitle}>
+        <Text
+          variant="titleMedium"
+          numberOfLines={1}
+          style={[styles.albumTitle, { color: theme.colors.onSurface }]}
+        >
           {album.name}
         </Text>
         <Text
           variant="bodySmall"
           style={[styles.albumMeta, { color: theme.colors.onSurfaceVariant }]}
         >
-          {album.imageCount}
+          {album.imageCount} object{album.imageCount !== 1 ? 's' : ''}
         </Text>
       </View>
     </Pressable>
   );
 }
 
-function AlbumImageTile({
-  item,
-  onPress,
-}: {
-  item: DirectoryFile;
-  onPress: () => void;
-}) {
-  const [previewFailed, setPreviewFailed] = React.useState(false);
-  const theme = useTheme();
-
-  return (
-    <Pressable onPress={onPress} style={styles.tilePressable}>
-      {previewFailed ? (
-        <View
-          style={[
-            styles.tileFallback,
-            { backgroundColor: theme.colors.surfaceVariant },
-          ]}
-        >
-          <LucideIcon
-            icon={ImageIcon}
-            color={theme.colors.onSurfaceVariant}
-            size={26}
-          />
-        </View>
-      ) : (
-        <FastImage
-          source={{ uri: item.url }}
-          style={styles.tileImage}
-          resizeMode={FastImage.resizeMode.cover}
-          onError={() => setPreviewFailed(true)}
-        />
-      )}
-    </Pressable>
-  );
-}
-
 export function AlbumsScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
   const { data, isLoading, isFetching, refetch } = useGetAlbumsQuery();
   const [createVisible, setCreateVisible] = React.useState(false);
@@ -145,6 +120,15 @@ export function AlbumsScreen() {
   const [viewerVisible, setViewerVisible] = React.useState(false);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [createAlbum, { isLoading: creatingAlbum }] = useCreateAlbumMutation();
+
+  const token = useAppSelector(state => state.auth.token);
+  const apiEnvironment = useAppSelector(
+    state => state.preferences.apiEnvironment,
+  );
+  const apiBaseUrl = React.useMemo(
+    () => getApiBaseUrl(resolveApiEnvironment(apiEnvironment)),
+    [apiEnvironment],
+  );
 
   const {
     data: albumImagesData,
@@ -157,10 +141,6 @@ export function AlbumsScreen() {
 
   const albums = data ?? [];
   const albumImages = albumImagesData ?? EMPTY_ALBUM_IMAGES;
-  const media = React.useMemo(
-    () => albumImages.map(item => ({ path: item.url, name: item.name })),
-    [albumImages],
-  );
 
   React.useEffect(() => {
     if (!selectedAlbum) {
@@ -200,24 +180,29 @@ export function AlbumsScreen() {
   );
 
   const albumGridColumns = 3;
-  const albumTileGap = 8;
-  const imageGridColumns = width >= 900 ? 4 : 3;
-  const tileGap = 12;
+  const albumTileGap = 12;
   const albumTileWidth = Math.floor(
     (width - 32 - albumTileGap * (albumGridColumns - 1)) / albumGridColumns,
   );
+
+  const imageGridColumns = 3;
+  const tileGap = 1;
   const tileWidth = Math.floor(
-    (width - 32 - tileGap * (imageGridColumns - 1)) / imageGridColumns,
+    (width - tileGap * (imageGridColumns - 1)) / imageGridColumns,
   );
 
-  const handleRefresh = () => {
-    if (selectedAlbum) {
-      refetchAlbumImages();
-      return;
+  const imageRows = React.useMemo(() => {
+    const rows: DirectoryFile[][] = [];
+    for (let index = 0; index < albumImages.length; index += imageGridColumns) {
+      rows.push(albumImages.slice(index, index + imageGridColumns));
     }
+    return rows;
+  }, [albumImages, imageGridColumns]);
 
-    refetch();
-  };
+  const media = React.useMemo(
+    () => albumImages.map(item => ({ path: item.url, name: item.name })),
+    [albumImages],
+  );
 
   const closeCreateModal = () => {
     setCreateVisible(false);
@@ -248,179 +233,179 @@ export function AlbumsScreen() {
 
   return (
     <Screen
-      style={[styles.screen, styles.darkScreen]}
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
       scrollable={false}
       noPadding
+      edges={['bottom', 'left', 'right']}
     >
-      <View style={styles.topBar}>
-        {selectedAlbum ? (
+      {selectedAlbum ? (
+        <>
+          <GalleryTopBar
+            title={selectedAlbum.name}
+            subtitle={`${albumImages.length} photo${
+              albumImages.length === 1 ? '' : 's'
+            }`}
+            isRefreshing={isAlbumImagesFetching}
+            onRefresh={() => {
+              refetchAlbumImages();
+            }}
+            onBack={() => setSelectedAlbum(null)}
+          />
+
+          <FlatList
+            data={imageRows}
+            key={`album-gallery-${imageGridColumns}`}
+            keyExtractor={(row, index) => row[0]?.path ?? `album-row-${index}`}
+            initialNumToRender={18}
+            maxToRenderPerBatch={24}
+            windowSize={9}
+            removeClippedSubviews={false}
+            renderItem={({ item: row }) => {
+              return (
+                <View
+                  style={[
+                    styles.imageRow,
+                    row.length < imageGridColumns ? styles.imageRowCentered : null,
+                  ]}
+                >
+                  {row.map((file, index) => {
+                    const mediaIndex = albumImages.findIndex(
+                      item => item.path === file.path,
+                    );
+
+                    return (
+                      <View
+                        key={file.path}
+                        style={{
+                          width: tileWidth,
+                          marginRight: index === row.length - 1 ? 0 : tileGap,
+                          marginBottom: tileGap,
+                        }}
+                      >
+                        <MemoizedGalleryImageTile
+                          item={file}
+                          token={token}
+                          apiBaseUrl={apiBaseUrl}
+                          onPress={() => {
+                            if (mediaIndex < 0) {
+                              return;
+                            }
+                            setSelectedIndex(mediaIndex);
+                            setViewerVisible(true);
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            }}
+            contentContainerStyle={[
+              styles.imagesContent,
+              { paddingBottom: insets.bottom + 48 },
+            ]}
+            ListEmptyComponent={
+              !isAlbumImagesLoading && !isAlbumImagesFetching ? (
+                <View style={styles.emptyState}>
+                  <Text
+                    variant="bodyMedium"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    No photos in this album yet.
+                  </Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              isAlbumImagesLoading || isAlbumImagesFetching ? (
+                <View style={styles.loadingWrap}>
+                  <ActivityIndicator />
+                </View>
+              ) : null
+            }
+          />
+        </>
+      ) : (
+        <>
+          <GalleryTopBar
+            title="Albums"
+            subtitle={`${albums.length} album${albums.length === 1 ? '' : 's'}`}
+            isRefreshing={isFetching}
+            onRefresh={() => {
+              refetch();
+            }}
+            onMenu={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+          />
+
+          <FlatList
+            data={albums}
+            key={`albums-${albumGridColumns}`}
+            keyExtractor={item => String(item.id)}
+            numColumns={albumGridColumns}
+            columnWrapperStyle={styles.albumColumns}
+            renderItem={({ item, index }) => (
+              <View
+                style={[
+                  styles.albumColumnItem,
+                  {
+                    width: albumTileWidth,
+                    marginRight:
+                      (index + 1) % albumGridColumns === 0 ? 0 : albumTileGap,
+                    marginBottom: albumTileGap,
+                  },
+                ]}
+              >
+                <AlbumCard album={item} onPress={() => setSelectedAlbum(item)} />
+              </View>
+            )}
+            contentContainerStyle={[
+              styles.albumContent,
+              { paddingBottom: insets.bottom + 100 },
+            ]}
+            ListEmptyComponent={
+              !isLoading && !isFetching ? (
+                <View style={styles.emptyState}>
+                  <LucideIcon
+                    icon={Folder}
+                    color={theme.colors.onSurfaceVariant}
+                    size={34}
+                  />
+                  <Text variant="titleMedium" style={styles.emptyTitle}>
+                    No albums yet
+                  </Text>
+                  <Text
+                    variant="bodyMedium"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    Create an album and start saving photos into it.
+                  </Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              isLoading || isFetching ? (
+                <View style={styles.loadingWrap}>
+                  <ActivityIndicator />
+                </View>
+              ) : null
+            }
+          />
+
           <Pressable
-            onPress={() => setSelectedAlbum(null)}
+            onPress={() => setCreateVisible(true)}
             style={({ pressed }) => [
-              styles.backButton,
+              styles.fab,
               {
-                backgroundColor: theme.colors.surfaceVariant,
-                opacity: pressed ? 0.8 : 1,
+                backgroundColor: theme.colors.primary,
+                bottom: insets.bottom + 22,
+                opacity: pressed ? 0.85 : 1,
               },
             ]}
           >
-            <LucideIcon
-              icon={ArrowLeft}
-              color={theme.colors.onSurface}
-              size={18}
-            />
+            <LucideIcon icon={Plus} color={theme.colors.onPrimary} size={22} />
           </Pressable>
-        ) : (
-          <View />
-        )}
-
-        <View style={styles.topBarCopy}>
-          <Text variant="titleSmall" numberOfLines={1}>
-            {selectedAlbum ? selectedAlbum.name : 'Albums'}
-          </Text>
-          <Text
-            variant="labelSmall"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {selectedAlbum
-              ? `${albumImages.length} photo${
-                  albumImages.length === 1 ? '' : 's'
-                }`
-              : `${albums.length} album${albums.length === 1 ? '' : 's'}`}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={handleRefresh}
-          style={({ pressed }) => [
-            styles.refreshButton,
-            {
-              backgroundColor: theme.colors.surfaceVariant,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          {isFetching || isAlbumImagesFetching ? (
-            <ActivityIndicator size={16} />
-          ) : (
-            <LucideIcon
-              icon={RefreshCw}
-              color={theme.colors.onSurface}
-              size={16}
-            />
-          )}
-        </Pressable>
-      </View>
-
-      {selectedAlbum ? (
-        <FlatList
-          data={albumImages}
-          key={`album-${imageGridColumns}`}
-          numColumns={imageGridColumns}
-          keyExtractor={item => item.path}
-          renderItem={({ item, index }) => (
-            <View
-              style={{
-                width: tileWidth,
-                marginRight: (index + 1) % imageGridColumns === 0 ? 0 : tileGap,
-                marginBottom: tileGap,
-              }}
-            >
-              <AlbumImageTile
-                item={item}
-                onPress={() => {
-                  setSelectedIndex(index);
-                  setViewerVisible(true);
-                }}
-              />
-            </View>
-          )}
-          contentContainerStyle={styles.imagesContent}
-          ListEmptyComponent={
-            !isAlbumImagesLoading && !isAlbumImagesFetching ? (
-              <View style={styles.emptyState}>
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  No photos in this album yet.
-                </Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            isAlbumImagesLoading || isAlbumImagesFetching ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator />
-              </View>
-            ) : null
-          }
-        />
-      ) : (
-        <FlatList
-          data={albums}
-          key={`albums-${albumGridColumns}`}
-          keyExtractor={item => String(item.id)}
-          numColumns={albumGridColumns}
-          columnWrapperStyle={styles.albumColumns}
-          renderItem={({ item, index }) => (
-            <View
-              style={[
-                styles.albumColumnItem,
-                {
-                  width: albumTileWidth,
-                  marginRight:
-                    (index + 1) % albumGridColumns === 0 ? 0 : albumTileGap,
-                  marginBottom: albumTileGap,
-                },
-              ]}
-            >
-              <AlbumCard album={item} onPress={() => setSelectedAlbum(item)} />
-            </View>
-          )}
-          contentContainerStyle={styles.albumContent}
-          ListEmptyComponent={
-            !isLoading && !isFetching ? (
-              <View style={styles.emptyState}>
-                <LucideIcon
-                  icon={Folder}
-                  color={theme.colors.onSurfaceVariant}
-                  size={34}
-                />
-                <Text variant="titleMedium" style={styles.emptyTitle}>
-                  No albums yet
-                </Text>
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  Create an album and start saving photos into it.
-                </Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            isLoading || isFetching ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator />
-              </View>
-            ) : null
-          }
-        />
+        </>
       )}
-
-      <Pressable
-        onPress={() => setCreateVisible(true)}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: theme.colors.primary,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <LucideIcon icon={Plus} color={theme.colors.onPrimary} size={22} />
-      </Pressable>
 
       <MediaViewerModal
         visible={viewerVisible}
@@ -494,51 +479,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  darkScreen: {
-    backgroundColor: '#000',
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
-    gap: 10,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 5,
-  },
-  topBarCopy: {
-    flex: 1,
-  },
-  refreshButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 22,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 4,
-    elevation: 4,
-  },
   albumContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   albumColumns: {
     justifyContent: 'flex-start',
@@ -546,13 +490,8 @@ const styles = StyleSheet.create({
   albumColumnItem: {
     paddingHorizontal: 0,
   },
-  albumFullWidth: {
-    width: '100%',
-    marginBottom: 4,
-  },
   albumCard: {
     width: '100%',
-    paddingHorizontal: 4,
     marginBottom: 4,
   },
   albumCardPressed: {
@@ -578,33 +517,23 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   albumTitle: {
-    color: '#f5f5f5',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
   },
   albumMeta: {
     fontSize: 11,
     lineHeight: 14,
   },
   imagesContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 6,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    paddingTop: 0,
   },
-  tilePressable: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: '#2b2c2f',
+  imageRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
-  tileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  tileFallback: {
-    flex: 1,
-    alignItems: 'center',
+  imageRowCentered: {
     justifyContent: 'center',
   },
   emptyState: {
@@ -621,6 +550,17 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 4,
+    elevation: 4,
   },
   createModal: {
     marginHorizontal: 18,
